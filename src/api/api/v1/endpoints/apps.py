@@ -15,14 +15,18 @@ async def get_factory_data(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(100, ge=1, le=10000, description="Rows per page"),
     factory: Optional[str] = Query(None, description="Filter by factory (Завод field), supports multiple values separated by comma"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (Склад field), supports multiple values separated by comma"),
+    MeasureType: Optional[str] = Query(None, description="Measure type (1=qty, 2=amount, 3=amount-qty)"),
+    Currency: Optional[str] = Query(None, description="Currency type (1=ZUD, 2=UZS, 3=ZUDMVP)"),
     app_service: AppService = Depends(get_app_service),
     api_key: str = Depends(verify_api_key)
 ):
     """
-    Get factory data with optional factory (Завод) filtering.
+    Get factory data with optional filtering and variable controls.
 
     This endpoint retrieves data from the factory_data pivot table (object ID: Dkjpv)
-    and supports filtering by the Завод (factory) field.
+    and supports filtering by Завод (factory) and Склад (warehouse) fields,
+    plus setting variables for measure type and currency.
 
     **Examples:**
 
@@ -39,6 +43,16 @@ async def get_factory_data(
     Filter by multiple factories:
     ```
     GET /api/v1/apps/afko/tables/factory_data/data?page=1&page_size=100&factory=1203,1204
+    ```
+
+    Filter by warehouse:
+    ```
+    GET /api/v1/apps/afko/tables/factory_data/data?page=1&page_size=100&warehouse=A100
+    ```
+
+    Filter by factory and warehouse with variables:
+    ```
+    GET /api/v1/apps/afko/tables/factory_data/data?page=1&page_size=100&factory=1203&warehouse=A100&MeasureType=1&Currency=2
     ```
 
     **Response format:**
@@ -96,6 +110,18 @@ async def get_factory_data(
         factory_values = [f.strip() for f in factory.split(',')]
         selections['Завод'] = factory_values  # Завод is the factory field in Qlik
 
+    if warehouse:
+        # Split comma-separated values
+        warehouse_values = [w.strip() for w in warehouse.split(',')]
+        selections['Склад'] = warehouse_values  # Склад is the warehouse field in Qlik
+
+    # Build variables dictionary
+    variables = {}
+    if MeasureType:
+        variables['vChooseType'] = MeasureType
+    if Currency:
+        variables['vChooseCur'] = Currency
+
     # Fetch data without bookmark - let's see what we get
     data = await app_service.get_object_data(
         app_name=app_name,
@@ -104,6 +130,7 @@ async def get_factory_data(
         page_size=page_size,
         filters={},  # No client-side filtering
         selections=selections,  # Apply Qlik selections for filtering
+        variables=variables,  # Apply Qlik variables
         bookmark_id=None  # No bookmark - fetch all data
     )
 
@@ -204,6 +231,7 @@ async def get_application_status_data(
         page_size=page_size,
         filters={},  # No client-side filtering
         selections={},  # No Qlik selections - rely on bookmark
+        variables={},  # No variables for this endpoint
         bookmark_id=bookmark_id  # Applied FIRST to filter the data
     )
 
@@ -285,5 +313,5 @@ async def get_table_data_with_measures(
     if warehouse:
         filters['LGORT'] = warehouse  # LGORT is the warehouse field in Qlik
 
-    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters)
+    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters, selections={}, variables={})
     return data

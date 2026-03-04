@@ -365,7 +365,7 @@ class AppRepository(BaseRepository):
             logger.error(f"Error fetching pivot data from '{object_id}': {str(e)}", exc_info=True)
             raise
 
-    def get_object_data(self, app_id: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None, selections: Dict = None, bookmark_id: str = None) -> Dict:
+    def get_object_data(self, app_id: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None, selections: Dict = None, variables: Dict = None, bookmark_id: str = None) -> Dict:
         """
         Get actual data from a Qlik object with dimensions and measures.
 
@@ -376,6 +376,7 @@ class AppRepository(BaseRepository):
             page_size: Number of rows per page
             filters: Optional dictionary of field filters for client-side filtering (field_name: value)
             selections: Optional dictionary of field selections to apply in Qlik before retrieving data (field_name: [values])
+            variables: Optional dictionary of variable values to set in Qlik before retrieving data (var_name: value)
             bookmark_id: Optional bookmark ID to apply before fetching data
 
         Returns:
@@ -389,6 +390,8 @@ class AppRepository(BaseRepository):
                 logger.info(f"Will apply client-side filters: {filters}")
             if selections:
                 logger.info(f"Will apply Qlik selections: {selections}")
+            if variables:
+                logger.info(f"Will set Qlik variables: {variables}")
 
             # Connect to engine
             self.engine_client.connect()
@@ -401,6 +404,15 @@ class AppRepository(BaseRepository):
                 # Apply bookmark first if provided
                 if bookmark_id:
                     self.engine_client.apply_bookmark(app_handle, bookmark_id)
+
+                # Set Qlik variables if provided (must be done before selections)
+                if variables:
+                    for var_name, var_value in variables.items():
+                        logger.info(f"Setting variable '{var_name}' to '{var_value}'")
+                        try:
+                            self.engine_client.set_variable_value(app_handle, var_name, var_value)
+                        except Exception as var_error:
+                            logger.warning(f"Failed to set variable '{var_name}': {str(var_error)}")
 
                 # Apply Qlik selections if provided
                 if selections:

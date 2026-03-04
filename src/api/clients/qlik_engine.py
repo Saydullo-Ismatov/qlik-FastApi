@@ -922,6 +922,48 @@ class QlikEngineClient(BaseClient):
         result = self.send_request("GetVariableList", handle=app_handle)
         return result.get("qVariableList", {}).get("qItems", [])
 
+    def set_variable_value(
+        self, app_handle: int, var_name: str, value: str
+    ) -> bool:
+        """
+        Set a variable value by name.
+
+        Args:
+            app_handle: Application handle
+            var_name: Variable name (e.g., "vChooseType")
+            value: Value to set (e.g., "1", "2", "3")
+
+        Returns:
+            True if successful, False otherwise
+
+        Raises:
+            Exception: If setting variable fails
+        """
+        try:
+            logger.info(f"Setting variable '{var_name}' to '{value}'")
+
+            # Get the variable object
+            var_result = self.send_request(
+                "GetVariableByName", [var_name], handle=app_handle
+            )
+            var_handle = var_result.get("qReturn", {}).get("qHandle")
+
+            if not var_handle:
+                raise Exception(f"Could not get handle for variable '{var_name}'")
+
+            # Set the string value
+            result = self.send_request(
+                "SetStringValue", [value], handle=var_handle
+            )
+
+            success = result.get("qReturn", False)
+            logger.info(f"Set variable '{var_name}' to '{value}': success={success}")
+            return success
+
+        except Exception as e:
+            logger.error(f"Error setting variable '{var_name}': {str(e)}")
+            raise
+
     def _extract_fields_from_expression(self, expression: str) -> List[str]:
         """
         Extract field names from a complex expression.

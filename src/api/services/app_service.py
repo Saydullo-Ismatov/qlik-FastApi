@@ -160,7 +160,7 @@ class AppService(BaseService):
         except asyncio.TimeoutError:
             raise Exception(f"Request timed out after 10 seconds - pivot table computation is taking too long. Consider using a bookmark to pre-filter the data.")
 
-    async def get_object_data(self, app_name: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None, selections: Dict = None, bookmark_id: str = None) -> Dict:
+    async def get_object_data(self, app_name: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None, selections: Dict = None, variables: Dict = None, bookmark_id: str = None) -> Dict:
         """Get actual data from an object.
 
         Retrieves data rows with dimension and measure values from
@@ -173,6 +173,7 @@ class AppService(BaseService):
             page_size: Number of rows per page.
             filters: Optional dictionary of field filters for client-side filtering (field_name: value).
             selections: Optional dictionary of field selections to apply in Qlik (field_name: [values]).
+            variables: Optional dictionary of variable values to set in Qlik (var_name: value).
             bookmark_id: Optional bookmark ID to apply before fetching data.
 
         Returns:
@@ -196,6 +197,7 @@ class AppService(BaseService):
             page_size,
             filters or {},
             selections or {},
+            variables or {},
             bookmark_id
         )
 

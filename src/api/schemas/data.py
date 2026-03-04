@@ -14,6 +14,16 @@ class DataFilterParams(BaseModel):
     sort_field: Optional[str] = Field(None, description="Field to sort by")
     sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
 
+    # New parameters for selections and variables
+    selections: Optional[dict[str, list[str]]] = Field(
+        None,
+        description="Field selections to apply (e.g., {'Склад': ['Склад 1', 'Склад 2']})"
+    )
+    variables: Optional[dict[str, str]] = Field(
+        None,
+        description="Variable values to set (e.g., {'vChooseType': '1', 'vChooseCur': '2'})"
+    )
+
 
 class TableDataResponse(BaseModel):
     """Response for table data retrieval."""

@@ -25,6 +25,9 @@ async def get_default_table_data(
     filter_value: Optional[str] = Query(None, description="Filter value"),
     sort_field: Optional[str] = Query(None, description="Field to sort by"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
+    warehouse: Optional[str] = Query(None, description="Warehouse filter value (e.g., 'Склад 1', '007 Склад')"),
+    MeasureType: Optional[str] = Query(None, description="Measure type (1=qty, 2=amount, 3=amount-qty)"),
+    Currency: Optional[str] = Query(None, description="Currency type (1=ZUD, 2=UZS, 3=ZUDMVP)"),
     data_service: DataService = Depends(get_data_service),
     api_key: str = Depends(verify_api_key),
     settings: settings = Depends(lambda: settings)
@@ -50,6 +53,11 @@ async def get_default_table_data(
     **With sorting:**
     ```
     GET /api/v1/apps/afko?page=1&sort_field=EmployeeID&sort_order=desc
+    ```
+
+    **With warehouse filter and variables:**
+    ```
+    GET /api/v1/apps/afko?page=1&warehouse=Склад 1&MeasureType=1&Currency=2
     ```
     """
     # Check app access
@@ -82,11 +90,26 @@ async def get_default_table_data(
         page = 1  # Default to page 1 if not specified
 
     pagination = PaginationData(page=page, page_size=page_size)
+
+    # Build selections dictionary - map warehouse parameter to Qlik field "Склад"
+    selections = {}
+    if warehouse:
+        selections["Склад"] = [warehouse]
+
+    # Build variables dictionary - map friendly names to Qlik variable names
+    variables = {}
+    if MeasureType:
+        variables["vChooseType"] = MeasureType
+    if Currency:
+        variables["vChooseCur"] = Currency
+
     filters = DataFilterParams(
         filter_field=filter_field,
         filter_value=filter_value,
         sort_field=sort_field,
-        sort_order=sort_order
+        sort_order=sort_order,
+        selections=selections if selections else None,
+        variables=variables if variables else None
     )
 
     result = await data_service.get_table_data(
