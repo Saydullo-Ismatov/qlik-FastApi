@@ -341,7 +341,7 @@ async def export_factory_data_to_excel(
 @router.get("/apps/{app_name}/tables/factory_data/export_native")
 async def export_factory_data_native(
     app_name: str = Path(..., description="Application name"),
-    file_type: str = Query("excel", description="Export format: excel, csv, or tsv"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
     factory: Optional[str] = Query(None, description="Filter by factory (Завод field), supports multiple values separated by comma"),
     warehouse: Optional[str] = Query(None, description="Filter by warehouse (Склад field), supports multiple values separated by comma"),
     typeOM: Optional[str] = Query(None, description="Filter by OM type (Тип ОМ field), supports multiple values separated by comma"),
@@ -360,6 +360,7 @@ async def export_factory_data_native(
     - excel (default): Excel .xlsx format
     - csv: Comma-separated values
     - tsv: Tab-separated values
+    - parquet: Apache Parquet format
 
     **This is significantly faster than the regular export endpoint for large datasets.**
     """
@@ -367,13 +368,14 @@ async def export_factory_data_native(
     format_mapping = {
         "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         "csv": ("CSV_C", ".csv", "text/csv"),
-        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values")
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
     }
 
     if file_type not in format_mapping:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv"
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
         )
 
     qlik_format, file_extension, media_type = format_mapping[file_type]
