@@ -865,11 +865,14 @@ class AppRepository(BaseRepository):
 
                     # Get the visual column order (how columns are displayed in the UI)
                     column_order = hc_def.get('qColumnOrder', [])
+                    # Use measure_labels count (from layout) as it's more reliable than
+                    # measure_expressions (from property tree, can be empty for some objects)
+                    num_measures = len(measure_labels)
                     if not column_order:
                         # Fallback to natural order if no column order is specified
-                        column_order = list(range(len(dim_fields) + len(measure_expressions)))
+                        column_order = list(range(len(dim_fields) + num_measures))
 
-                    logger.info(f"Object has {len(dim_fields)} dimensions and {len(measure_expressions)} measures")
+                    logger.info(f"Object has {len(dim_fields)} dimensions and {num_measures} measures")
                     logger.info(f"Visual column order: {column_order}")
 
                     logger.info(f"Object hypercube has {total_rows} total rows after bookmark/selections")
@@ -878,7 +881,7 @@ class AppRepository(BaseRepository):
                     # Calculate how many rows to fetch
                     # Qlik has a limit on cells per request (~10,000 cells typically)
                     # With 15 columns (12 dims + 3 measures), max safe rows is ~500-600
-                    num_columns = len(dim_fields) + len(measure_expressions)
+                    num_columns = len(dim_fields) + num_measures
                     max_safe_rows = min(500, 10000 // max(num_columns, 1))  # Conservative limit
 
                     fetch_rows = 1000 if filters else page_size
