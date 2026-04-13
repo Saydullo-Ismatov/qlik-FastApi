@@ -376,7 +376,7 @@ class QlikEngineClient(BaseClient):
                 return []
 
             sheet_list_handle = create_result["qReturn"]["qHandle"]
-            layout_result = self.send_request("GetLayout", [], handle=sheet_list_handle)
+            layout_result = self.send_request("GetLayout", handle=sheet_list_handle)
             if "qLayout" not in layout_result or "qAppObjectList" not in layout_result["qLayout"]:
                 logger.warning(f"No sheet list in layout: {layout_result}")
                 return []
@@ -664,7 +664,7 @@ class QlikEngineClient(BaseClient):
                 except Exception:
                     pass
 
-            layout = self.send_request("GetLayout", [], handle=cube_handle)
+            layout = self.send_request("GetLayout", handle=cube_handle)
 
             # Restore original timeout
             if extended_timeout > original_timeout:
@@ -789,7 +789,7 @@ class QlikEngineClient(BaseClient):
 
             list_handle = result["qReturn"]["qHandle"]
 
-            layout = self.send_request("GetLayout", [], handle=list_handle)
+            layout = self.send_request("GetLayout", handle=list_handle)
 
             if "qLayout" not in layout or "qListObject" not in layout["qLayout"]:
                 try:
@@ -868,7 +868,7 @@ class QlikEngineClient(BaseClient):
                             if "qReturn" in measure_result:
                                 measure_handle = measure_result["qReturn"]["qHandle"]
                                 if measure_handle:
-                                    layout_result = self.send_request("GetLayout", [], handle=measure_handle)
+                                    layout_result = self.send_request("GetLayout", handle=measure_handle)
                                     if "qLayout" in layout_result:
                                         layout = layout_result["qLayout"]
                                         measure_data = {
@@ -1258,7 +1258,7 @@ class QlikEngineClient(BaseClient):
             q_no_of_left_dims = hc_def.get("qNoOfLeftDims", n_dims)
 
             # GetLayout to know total row count (very fast — reads cached state)
-            layout = self.send_request("GetLayout", [], handle=obj_handle)
+            layout = self.send_request("GetLayout", handle=obj_handle)
             hc = layout.get("qLayout", {}).get("qHyperCube", {})
             total_rows = hc.get("qSize", {}).get("qcy", 0)
 

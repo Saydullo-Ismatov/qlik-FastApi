@@ -438,7 +438,7 @@ class AppRepository(BaseRepository):
                 obj_handle = obj_response['qReturn']['qHandle']
 
                 # Get layout first to get correct dimension/measure info and row count
-                layout = self.engine_client.send_request('GetLayout', [], handle=obj_handle)
+                layout = self.engine_client.send_request('GetLayout', handle=obj_handle)
                 hc_layout = layout.get('qLayout', {}).get('qHyperCube', {})
                 qsize = hc_layout.get('qSize', {})
                 total_rows = qsize.get('qcy', 0)
@@ -612,7 +612,7 @@ class AppRepository(BaseRepository):
 
                         try:
                             # Get layout to check total rows
-                            session_layout = self.engine_client.send_request('GetLayout', [], handle=session_handle)
+                            session_layout = self.engine_client.send_request('GetLayout', handle=session_handle)
                             session_hc = session_layout.get('qLayout', {}).get('qHyperCube', {})
                             session_total_rows = session_hc.get('qSize', {}).get('qcy', 0)
 

@@ -1216,13 +1216,13 @@ async def get_table_data_with_measures(
             detail=f"No object mapping found for table '{table_name}' in app '{app_name}'"
         )
 
-    # Build filters dictionary
+    # Build selections dictionary for Qlik-side filtering (server-side, efficient pagination)
     # Map query parameters to actual Qlik field names
-    filters = {}
+    selections = {}
     if factory:
-        filters['PRCTR'] = factory  # PRCTR is the factory field in Qlik
+        selections['PRCTR'] = [factory]  # PRCTR is the factory field in Qlik
     if warehouse:
-        filters['LGORT'] = warehouse  # LGORT is the warehouse field in Qlik
+        selections['LGORT'] = [warehouse]  # LGORT is the warehouse field in Qlik
 
-    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters, selections={}, variables={})
+    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters={}, selections=selections, variables={})
     return data
