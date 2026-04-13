@@ -244,6 +244,8 @@ class AppRepository(BaseRepository):
                 # Open the app
                 result = self.engine_client.open_doc(app_id, no_data=False)
                 app_handle = result['qReturn']['qHandle']
+                if not app_handle or app_handle == -1:
+                    raise Exception(f"OpenDoc returned invalid handle {app_handle} for app '{app_id}'")
 
                 # Get the object
                 obj_response = self.engine_client.send_request('GetObject', [object_id], handle=app_handle)
@@ -339,6 +341,8 @@ class AppRepository(BaseRepository):
             try:
                 result = self.engine_client.open_doc(app_id, no_data=False)
                 app_handle = result['qReturn']['qHandle']
+                if not app_handle or app_handle == -1:
+                    raise Exception(f"OpenDoc returned invalid handle {app_handle} for app '{app_id}'")
 
                 pivot_data = self.engine_client.get_pivot_data(
                     app_handle=app_handle,
@@ -400,6 +404,8 @@ class AppRepository(BaseRepository):
                 # Open the app
                 result = self.engine_client.open_doc(app_id, no_data=False)
                 app_handle = result['qReturn']['qHandle']
+                if not app_handle or app_handle == -1:
+                    raise Exception(f"OpenDoc returned invalid handle {app_handle} for app '{app_id}' — app may not be accessible")
 
                 # Apply bookmark first if provided
                 if bookmark_id:

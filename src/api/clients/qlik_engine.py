@@ -202,20 +202,21 @@ class QlikEngineClient(BaseClient):
             else:
                 return self.send_request("OpenDoc", [app_id])
         except Exception as e:
-            # If app is already open, try to get existing handle
+            # If app is already open, get the handle of the active document
             if "already open" in str(e).lower():
                 try:
-                    doc_list = self.get_doc_list()
-                    for doc in doc_list:
-                        if doc.get("qDocId") == app_id:
-                            return {
-                                "qReturn": {
-                                    "qHandle": doc.get("qHandle", -1),
-                                    "qGenericId": app_id
-                                }
+                    active_result = self.send_request("GetActiveDoc")
+                    active_handle = active_result.get("qReturn", {}).get("qHandle")
+                    if active_handle is not None and active_handle != -1:
+                        logger.info(f"App '{app_id}' already open, using active doc handle {active_handle}")
+                        return {
+                            "qReturn": {
+                                "qHandle": active_handle,
+                                "qGenericId": app_id
                             }
-                except:
-                    pass
+                        }
+                except Exception as active_err:
+                    logger.warning(f"GetActiveDoc failed after 'already open': {active_err}")
             raise e
 
     def close_doc(self, app_handle: int) -> bool:
