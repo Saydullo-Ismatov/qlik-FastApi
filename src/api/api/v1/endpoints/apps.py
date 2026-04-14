@@ -1149,6 +1149,280 @@ async def get_application_status_data(
     return data
 
 
+@router.get("/apps/{app_name}/tables/stock_qty/export_native")
+async def export_stock_qty_native(
+    app_name: str = Path(..., description="Application name"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
+    factory: Optional[str] = Query(None, description="Filter by factory (PRCTR field)"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (LGORT field)"),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export stock quantity data using Qlik's native ExportData method.
+
+    **Supported formats:** excel (default), csv, tsv, parquet
+
+    **Examples:**
+    ```
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?factory=1203
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?factory=1203&warehouse=P210
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?file_type=csv&factory=1203
+    ```
+    """
+    format_mapping = {
+        "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "csv": ("CSV_C", ".csv", "text/csv"),
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
+    }
+
+    if file_type not in format_mapping:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
+        )
+
+    qlik_format, file_extension, media_type = format_mapping[file_type]
+    table_name = "stock_qty"
+
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to app '{app_name}'")
+
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'")
+
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(status_code=404, detail=f"No object mapping found for table '{table_name}' in app '{app_name}'")
+
+    app_id = settings.get_app_id(app_name)
+    if not app_id:
+        raise HTTPException(status_code=404, detail=f"App '{app_name}' not found in configuration")
+
+    client = QlikEngineClient(settings)
+
+    try:
+        client.connect()
+        result = client.open_doc(app_id, no_data=False)
+        app_handle = result['qReturn']['qHandle']
+
+        # Apply field selections for filtering
+        if factory:
+            factory_values = [f.strip() for f in factory.split(',')]
+            client.select_in_field(app_handle, 'PRCTR', factory_values, toggle=False)
+
+        if warehouse:
+            warehouse_values = [w.strip() for w in warehouse.split(',')]
+            client.select_in_field(app_handle, 'LGORT', warehouse_values, toggle=False)
+
+        # Get object handle
+        obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
+        obj_handle = obj_result['qReturn']['qHandle']
+
+        # Export with fallback for unsupported formats
+        export_result = None
+        actual_format = qlik_format
+        actual_extension = file_extension
+        actual_media_type = media_type
+
+        try:
+            export_result = client.export_data(
+                object_handle=obj_handle,
+                file_type=qlik_format,
+                path="/qHyperCubeDef",
+                export_state="P"
+            )
+        except Exception as export_error:
+            if qlik_format == "PARQUET" and "3004" in str(export_error):
+                logger.warning(f"PARQUET format not supported, falling back to Excel")
+                actual_format = "OOXML"
+                actual_extension = ".xlsx"
+                actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                export_result = client.export_data(
+                    object_handle=obj_handle,
+                    file_type=actual_format,
+                    path="/qHyperCubeDef",
+                    export_state="P"
+                )
+            else:
+                raise
+
+        temp_url = export_result.get('qUrl')
+        if not temp_url:
+            raise HTTPException(status_code=500, detail="Qlik did not return a download URL")
+
+        from pathlib import Path as FilePath
+        parts = temp_url.strip('/').split('/')
+        guid_folder = parts[1]
+        filename = parts[2].split('?')[0]
+
+        base_path = FilePath("C:/ProgramData/Qlik/Sense/Repository/TempContent")
+        file_path = base_path / guid_folder / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=500, detail=f"Exported file not found at {file_path}. Ensure API runs on Qlik server.")
+
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"stock_qty_{timestamp}{actual_extension}"
+
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=actual_media_type,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    finally:
+        try:
+            client.close()
+        except:
+            pass
+
+
+@router.get("/apps/{app_name}/tables/application_status/export_native")
+async def export_application_status_native(
+    app_name: str = Path(..., description="Application name"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
+    yearmonth: Optional[str] = Query(None, description="Filter by YearMonth (format: 2026-01 or 2026.01), supports multiple values separated by comma"),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export application status data using Qlik's native ExportData method.
+
+    **Supported formats:** excel (default), csv, tsv, parquet
+
+    **Examples:**
+    ```
+    GET /api/v1/apps/Stock/tables/application_status/export_native
+    GET /api/v1/apps/Stock/tables/application_status/export_native?yearmonth=2024-01
+    GET /api/v1/apps/Stock/tables/application_status/export_native?yearmonth=2024-01,2024-02&file_type=csv
+    ```
+    """
+    format_mapping = {
+        "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "csv": ("CSV_C", ".csv", "text/csv"),
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
+    }
+
+    if file_type not in format_mapping:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
+        )
+
+    qlik_format, file_extension, media_type = format_mapping[file_type]
+    table_name = "application_status"
+
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to app '{app_name}'")
+
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'")
+
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(status_code=404, detail=f"No object mapping found for table '{table_name}' in app '{app_name}'")
+
+    app_id = settings.get_app_id(app_name)
+    if not app_id:
+        raise HTTPException(status_code=404, detail=f"App '{app_name}' not found in configuration")
+
+    bookmark_id = settings.get_bookmark_id(app_name, table_name)
+
+    client = QlikEngineClient(settings)
+
+    try:
+        client.connect()
+        result = client.open_doc(app_id, no_data=False)
+        app_handle = result['qReturn']['qHandle']
+
+        # Apply bookmark if available
+        if bookmark_id:
+            client.send_request('ApplyBookmark', [bookmark_id], handle=app_handle)
+
+        # Apply YearMonth selection
+        if yearmonth:
+            yearmonth_values = [ym.strip().replace('.', '-') for ym in yearmonth.split(',')]
+            client.select_in_field(app_handle, 'YearMonth', yearmonth_values, toggle=False)
+
+        # Get object handle
+        obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
+        obj_handle = obj_result['qReturn']['qHandle']
+
+        # Export with fallback for unsupported formats
+        export_result = None
+        actual_format = qlik_format
+        actual_extension = file_extension
+        actual_media_type = media_type
+
+        try:
+            export_result = client.export_data(
+                object_handle=obj_handle,
+                file_type=qlik_format,
+                path="/qHyperCubeDef",
+                export_state="P"
+            )
+        except Exception as export_error:
+            if qlik_format == "PARQUET" and "3004" in str(export_error):
+                logger.warning(f"PARQUET format not supported, falling back to Excel")
+                actual_format = "OOXML"
+                actual_extension = ".xlsx"
+                actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                export_result = client.export_data(
+                    object_handle=obj_handle,
+                    file_type=actual_format,
+                    path="/qHyperCubeDef",
+                    export_state="P"
+                )
+            else:
+                raise
+
+        temp_url = export_result.get('qUrl')
+        if not temp_url:
+            raise HTTPException(status_code=500, detail="Qlik did not return a download URL")
+
+        from pathlib import Path as FilePath
+        parts = temp_url.strip('/').split('/')
+        guid_folder = parts[1]
+        filename = parts[2].split('?')[0]
+
+        base_path = FilePath("C:/ProgramData/Qlik/Sense/Repository/TempContent")
+        file_path = base_path / guid_folder / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=500, detail=f"Exported file not found at {file_path}. Ensure API runs on Qlik server.")
+
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"application_status_{timestamp}{actual_extension}"
+
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=actual_media_type,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    finally:
+        try:
+            client.close()
+        except:
+            pass
+
+
 @router.get("/apps/{app_name}/tables/{table_name}/data")
 async def get_table_data_with_measures(
     app_name: str = Path(..., description="Application name"),
