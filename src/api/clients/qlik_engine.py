@@ -1056,7 +1056,21 @@ class QlikEngineClient(BaseClient):
             if not field_handle:
                 raise Exception(f"Could not get handle for field '{field_name}'")
 
-            # Select values.
+            # Build field values with both text and numeric representations.
+            # Qlik's SelectValues can silently fail (qReturn=false) when a
+            # numeric field is matched by qText alone.  Passing qIsNumeric
+            # and qNumber for values that look numeric ensures the match.
+            field_values = []
+            for value in values:
+                fv = {"qText": str(value)}
+                try:
+                    num = float(value)
+                    fv["qIsNumeric"] = True
+                    fv["qNumber"] = num
+                except (ValueError, TypeError):
+                    pass
+                field_values.append(fv)
+
             # softLock=True: allow this selection to override soft-locked fields
             # (fields locked by a bookmark).  Without this, a SelectValues call
             # on a field that the bookmark locked silently returns qReturn=False
@@ -1064,7 +1078,7 @@ class QlikEngineClient(BaseClient):
             result = self.send_request(
                 "SelectValues",
                 [
-                    [{"qText": str(value)} for value in values],
+                    field_values,
                     toggle,
                     True  # softLock = True — override bookmark locks
                 ],

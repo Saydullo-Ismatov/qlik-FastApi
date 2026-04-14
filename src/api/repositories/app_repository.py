@@ -618,6 +618,42 @@ class AppRepository(BaseRepository):
 
                             logger.info(f"Session hypercube has {session_total_rows} rows")
 
+                            # Try to apply selections at the Qlik Engine level using correct field names
+                            # The initial select_values may have failed if field names don't match
+                            # dim_defs has the actual field names from the pivot object
+                            selections_applied_in_qlik = False
+                            if selections:
+                                for sel_field, sel_values in selections.items():
+                                    if not isinstance(sel_values, list):
+                                        sel_values = [sel_values]
+                                    # Find the actual Qlik field name from dim_defs
+                                    actual_field = None
+                                    for i, field in enumerate(dim_defs):
+                                        if field == sel_field or dim_labels_list[i] == sel_field:
+                                            actual_field = field
+                                            break
+                                    if actual_field:
+                                        try:
+                                            logger.info(f"Applying Qlik selection on field '{actual_field}' (from '{sel_field}') with values: {sel_values}")
+                                            self.engine_client.select_values(app_handle, actual_field, sel_values)
+                                            selections_applied_in_qlik = True
+                                        except Exception as sel_err:
+                                            logger.warning(f"Failed to apply Qlik selection on '{actual_field}': {sel_err}")
+
+                                if selections_applied_in_qlik:
+                                    # Re-get layout to see the filtered row count
+                                    session_layout = self.engine_client.send_request('GetLayout', handle=session_handle)
+                                    session_hc = session_layout.get('qLayout', {}).get('qHyperCube', {})
+                                    new_total = session_hc.get('qSize', {}).get('qcy', 0)
+                                    logger.info(f"Session hypercube after selections: {new_total} rows (was {session_total_rows})")
+                                    if new_total < session_total_rows:
+                                        session_total_rows = new_total
+                                        # Selections worked at Qlik level - no need for client-side filtering
+                                        selections = {}
+                                        logger.info("Selections applied successfully in Qlik Engine - using server-side pagination")
+                                    else:
+                                        logger.info("Selections did not reduce row count - will use client-side filtering")
+
                             # Determine if we need client-side filtering
                             # Also fetch all data if _force_session_hypercube flag is set (for Excel export)
                             force_full_fetch = filters.pop('_force_session_hypercube', False) if filters else False
@@ -987,9 +1023,8 @@ class AppRepository(BaseRepository):
                     # If filters were applied, total_rows is the filtered count; otherwise use the object's total
                     pagination_total = len(filtered_rows) if filters else total_rows
 
-                    # Use actual fetched rows (might be less than requested page_size due to Qlik limits)
-                    actual_page_size = len(filtered_rows) if not filters else page_size
-                    total_pages = (pagination_total + actual_page_size - 1) // actual_page_size if pagination_total > 0 else 1
+                    # Always use the requested page_size for pagination calculations
+                    total_pages = (pagination_total + page_size - 1) // page_size if pagination_total > 0 else 1
 
                     # For filtered data, we already have all rows in memory, so paginate from that
                     # For non-filtered data, we already fetched only the requested page
@@ -1007,7 +1042,7 @@ class AppRepository(BaseRepository):
                         'data': data_rows,
                         'pagination': {
                             'page': page,
-                            'page_size': actual_page_size,  # Return actual size, not requested
+                            'page_size': page_size,
                             'total_rows': pagination_total,
                             'total_pages': total_pages,
                             'has_next': page < total_pages,
