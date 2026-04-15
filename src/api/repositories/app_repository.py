@@ -824,13 +824,18 @@ class AppRepository(BaseRepository):
                                 pass
 
                             # Paginate the filtered data
-                            total_filtered = len(filtered_data)
-                            total_pages = (total_filtered + page_size - 1) // page_size if page_size > 0 else 1
-
-                            # Apply pagination to filtered data
-                            start_idx = (page - 1) * page_size
-                            end_idx = start_idx + page_size
-                            paginated_data = filtered_data[start_idx:end_idx]
+                            if need_client_side_filtering:
+                                # Client-side filtering: total is the filtered count, paginate from filtered data
+                                total_filtered = len(filtered_data)
+                                total_pages = (total_filtered + page_size - 1) // page_size if page_size > 0 else 1
+                                start_idx = (page - 1) * page_size
+                                end_idx = start_idx + page_size
+                                paginated_data = filtered_data[start_idx:end_idx]
+                            else:
+                                # No filtering: total is from the session layout, data is already the correct page
+                                total_filtered = session_total_rows
+                                total_pages = (total_filtered + page_size - 1) // page_size if page_size > 0 else 1
+                                paginated_data = filtered_data
 
                             if need_client_side_filtering:
                                 logger.info(f"Client-side filtering applied: {len(session_data)} total rows -> {total_filtered} filtered rows")
