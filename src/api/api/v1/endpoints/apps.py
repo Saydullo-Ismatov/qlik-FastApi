@@ -471,7 +471,7 @@ async def export_factory_data_native(
                 object_handle=obj_handle,
                 file_type=qlik_format,
                 path="/qHyperCubeDef",
-                export_state="A"  # All values
+                export_state="P"  # P = Possible values (respects current selections/filters)
             )
         except Exception as export_error:
             # Check if error is "Unsupported file format" (code 3004) for PARQUET
@@ -490,7 +490,7 @@ async def export_factory_data_native(
                     object_handle=obj_handle,
                     file_type=actual_format,
                     path="/qHyperCubeDef",
-                    export_state="A"
+                    export_state="P"  # P = Possible values (respects current selections/filters)
                 )
             else:
                 # Re-raise if it's a different error
