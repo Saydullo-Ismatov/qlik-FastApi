@@ -613,7 +613,9 @@ class AppRepository(BaseRepository):
                             logger.info(f"Session hypercube has {session_total_rows} rows")
 
                             # Determine if we need client-side filtering
-                            need_client_side_filtering = bool(filters) or bool(selections)
+                            # Also fetch all data if _force_session_hypercube flag is set (for Excel export)
+                            force_full_fetch = filters.pop('_force_session_hypercube', False) if filters else False
+                            need_client_side_filtering = bool(filters) or bool(selections) or force_full_fetch
 
                             session_data = []
                             total_cols = len(dim_defs) + len(meas_defs)

@@ -1505,3 +1505,51 @@ class QlikEngineClient(BaseClient):
         except Exception as e:
             logger.error(f"Error clearing selections: {str(e)}")
             raise
+
+    def export_data(
+        self,
+        object_handle: int,
+        file_type: str = "OOXML",
+        path: str = "/qHyperCubeDef",
+        export_state: str = "A"
+    ) -> Dict[str, Any]:
+        """
+        Export data from a generic object to Excel or CSV.
+
+        Args:
+            object_handle: Handle of the object to export
+            file_type: File format - "OOXML" for Excel, "CSV_C" or "CSV_T" for CSV
+            path: Path to the object definition (e.g., "/qHyperCubeDef")
+            export_state: Export state - "A" for all values, "P" for possible values only
+
+        Returns:
+            Dict containing:
+                - qUrl: URL of the exported file
+                - qWarnings: List of warning codes (if any)
+
+        Raises:
+            Exception: If export fails
+        """
+        try:
+            logger.info(f"Exporting data from object handle {object_handle} to {file_type}")
+
+            params = {
+                "qFileType": file_type,
+                "qPath": path,
+                "qExportState": export_state
+            }
+
+            result = self.send_request("ExportData", [file_type, path, "", export_state], handle=object_handle)
+
+            # ExportData returns result directly (not wrapped in qReturn)
+            if 'qUrl' in result:
+                logger.info(f"Export successful. URL: {result.get('qUrl', 'N/A')}")
+                if result.get('qWarnings'):
+                    logger.warning(f"Export warnings: {result['qWarnings']}")
+                return result
+            else:
+                raise Exception(f"Unexpected export response: {result}")
+
+        except Exception as e:
+            logger.error(f"Error exporting data: {str(e)}")
+            raise

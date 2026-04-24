@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     QLIK_SENSE_PORT: int = Field(default=4747, description="Qlik Sense server port")
     QLIK_ENGINE_PORT: int = Field(default=4747, description="Qlik Engine API port")
     QLIK_REPOSITORY_PORT: int = Field(default=4242, description="Qlik Repository API port")
+    QLIK_PROXY_PORT: int = Field(default=4243, description="Qlik Proxy port for downloads")
 
     # Qlik Authentication
     QLIK_USER_DIRECTORY: str = Field(..., description="Qlik user directory (domain)")
