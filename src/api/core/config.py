@@ -85,6 +85,13 @@ class Settings(BaseSettings):
         description="JSON mapping of app+table names to Qlik object IDs for dimensions/measures"
     )
 
+    # Default Bookmark Mappings (JSON format: {"app-name.table-name": "bookmark-id"})
+    # Bookmarks are applied before fetching pivot data to filter to a manageable dataset.
+    DEFAULT_BOOKMARKS_JSON: str = Field(
+        default='{}',
+        description="JSON mapping of app+table names to default Qlik bookmark IDs"
+    )
+
     # API Key Permissions
     API_KEYS_JSON: str = Field(
         default='{}',
@@ -172,6 +179,20 @@ class Settings(BaseSettings):
         """Get object ID for a table name in a specific app."""
         key = f"{app_name}.{table_name}"
         return self.table_object_mappings.get(key)
+
+    @property
+    def default_bookmarks(self) -> dict[str, str]:
+        """Get app+table to bookmark ID mappings."""
+        import json
+        try:
+            return json.loads(self.DEFAULT_BOOKMARKS_JSON)
+        except (json.JSONDecodeError, ValueError):
+            return {}
+
+    def get_bookmark_id(self, app_name: str, table_name: str) -> str | None:
+        """Get default bookmark ID for a table in a specific app."""
+        key = f"{app_name}.{table_name}"
+        return self.default_bookmarks.get(key)
 
     @property
     def api_keys(self) -> dict[str, dict]:

@@ -76,3 +76,7 @@ poetry.lock
 # Backup files
 *.bak
 *.tmp
+
+
+# MarkDown Files
+*.md

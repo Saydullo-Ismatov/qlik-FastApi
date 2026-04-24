@@ -54,6 +54,10 @@ class DataRepository(BaseRepository):
             # Calculate offset for pagination
             offset = (page - 1) * page_size
 
+            # Track if selections were applied (for cleanup)
+            selections_applied = False
+            app_handle = -1
+
             # Connect to engine
             self.engine_client.connect()
 
@@ -70,6 +74,25 @@ class DataRepository(BaseRepository):
 
                 logger.info(f"Successfully opened app with handle: {app_handle}")
 
+                # Apply variables first (if any)
+                if filters.variables:
+                    logger.info(f"Setting variables: {filters.variables}")
+                    for var_name, var_value in filters.variables.items():
+                        try:
+                            self.engine_client.set_variable_value(app_handle, var_name, var_value)
+                        except Exception as var_error:
+                            logger.warning(f"Failed to set variable {var_name}: {var_error}")
+
+                # Apply selections (if any)
+                if filters.selections:
+                    logger.info(f"Applying selections: {filters.selections}")
+                    for field_name, values in filters.selections.items():
+                        try:
+                            self.engine_client.select_values(app_handle, field_name, values)
+                            selections_applied = True
+                        except Exception as sel_error:
+                            logger.warning(f"Failed to apply selection on {field_name}: {sel_error}")
+
                 # Get the object/table to understand its structure
                 try:
                     obj_response = self.engine_client.get_object(app_handle, table_name)
@@ -85,10 +108,10 @@ class DataRepository(BaseRepository):
                 # Extract hypercube data from the object
                 obj_handle = obj_response.get("qReturn", {}).get("qHandle", -1)
 
-                if obj_handle != -1:
+                if obj_handle not in (-1, None):
                     # Get the object's layout to access its hypercube
                     layout_response = self.engine_client.send_request(
-                        "GetLayout", [], handle=obj_handle
+                        "GetLayout", {}, handle=obj_handle
                     )
 
                     layout = layout_response.get("qLayout", {})
@@ -200,6 +223,14 @@ class DataRepository(BaseRepository):
                 )
 
             finally:
+                # Clear selections to keep API stateless
+                if selections_applied and app_handle != -1:
+                    try:
+                        logger.info("Clearing selections to maintain stateless API")
+                        self.engine_client.clear_all(app_handle)
+                    except Exception as clear_error:
+                        logger.warning(f"Failed to clear selections: {clear_error}")
+
                 # Disconnect from engine
                 self.engine_client.disconnect()
 

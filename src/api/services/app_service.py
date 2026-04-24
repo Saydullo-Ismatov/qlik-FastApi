@@ -116,7 +116,51 @@ class AppService(BaseService):
 
         return definition
 
-    async def get_object_data(self, app_name: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None) -> Dict:
+    async def get_pivot_object_data(self, app_name: str, object_id: str, page: int = 1, page_size: int = 100, selections: Dict = None, bookmark_id: str = None) -> Dict:
+        """Get data from a pivot-table object using GetHyperCubePivotData.
+
+        Much faster than session hypercube creation for pivot table objects.
+
+        When bookmark_id is provided it is applied to the Qlik session before
+        fetching, which filters the pivot table and reveals all dimension levels
+        that would otherwise be too large to compute.
+
+        Args:
+            app_name: Name of the application.
+            object_id: ID of the pivot table object.
+            page: Page number (1-based).
+            page_size: Number of rows per page.
+            selections: Optional dict of field selections (field -> [values]).
+            bookmark_id: Optional bookmark ID to apply before fetching.
+
+        Returns:
+            Dictionary containing data rows with pagination info.
+        """
+        app_id = self.app_repo.get_app_id_by_name(app_name)
+        if not app_id:
+            raise AppNotFoundException(app_name)
+
+        try:
+            # Add 10 second timeout using asyncio.wait_for
+            data = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.app_repo.get_pivot_object_data,
+                    app_id,
+                    object_id,
+                    page,
+                    page_size,
+                    selections or {},
+                    bookmark_id
+                ),
+                timeout=10.0
+            )
+
+            data['app_name'] = app_name
+            return data
+        except asyncio.TimeoutError:
+            raise Exception(f"Request timed out after 10 seconds - pivot table computation is taking too long. Consider using a bookmark to pre-filter the data.")
+
+    async def get_object_data(self, app_name: str, object_id: str, page: int = 1, page_size: int = 100, filters: Dict = None, selections: Dict = None, variables: Dict = None, bookmark_id: str = None) -> Dict:
         """Get actual data from an object.
 
         Retrieves data rows with dimension and measure values from
@@ -127,7 +171,10 @@ class AppService(BaseService):
             object_id: ID of the object to retrieve data from.
             page: Page number (1-based).
             page_size: Number of rows per page.
-            filters: Optional dictionary of field filters (field_name: value).
+            filters: Optional dictionary of field filters for client-side filtering (field_name: value).
+            selections: Optional dictionary of field selections to apply in Qlik (field_name: [values]).
+            variables: Optional dictionary of variable values to set in Qlik (var_name: value).
+            bookmark_id: Optional bookmark ID to apply before fetching data.
 
         Returns:
             Dictionary containing data rows with pagination info.
@@ -148,7 +195,10 @@ class AppService(BaseService):
             object_id,
             page,
             page_size,
-            filters or {}
+            filters or {},
+            selections or {},
+            variables or {},
+            bookmark_id
         )
 
         # Add app_name to the result
