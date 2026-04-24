@@ -552,6 +552,502 @@ async def export_factory_data_native(
             pass
 
 
+@router.get("/apps/{app_name}/tables/factory_material_remainder/data")
+async def get_factory_material_remainder(
+    app_name: str = Path(..., description="Application name"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(100, ge=1, le=10000, description="Rows per page"),
+    factory: Optional[str] = Query(None, description="Filter by factory (Завод field), supports multiple values separated by comma"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (Склад field), supports multiple values separated by comma"),
+    typeOM: Optional[str] = Query(None, description="Filter by OM type (Тип ОМ field), supports multiple values separated by comma"),
+    yearMonth: Optional[str] = Query(None, description="Filter by YearMonth (format: 2024-01 or 2024.01), supports multiple values separated by comma"),
+    MeasureType: Optional[str] = Query(None, description="Measure type (1=qty, 2=amount, 3=amount-qty)"),
+    Currency: Optional[str] = Query(None, description="Currency type (1=ZUD, 2=UZS, 3=ZUDMVP)"),
+    app_service: AppService = Depends(get_app_service),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Get factory material remainder data (materials remaining at end of day) with optional filtering.
+
+    This endpoint retrieves data from the factory_material_remainder table (object ID: 26bfee13-02c5-41d6-afe7-439ec9545088)
+    and supports filtering by Завод (factory), Склад (warehouse), and Тип ОМ fields,
+    plus setting variables for measure type and currency.
+
+    **Examples:**
+
+    Get all data (no filtering):
+    ```
+    GET /api/v1/apps/afko/tables/factory_material_remainder/data?page=1&page_size=100
+    ```
+
+    Filter by factory:
+    ```
+    GET /api/v1/apps/afko/tables/factory_material_remainder/data?page=1&page_size=100&factory=1203
+    ```
+
+    Filter by multiple factories:
+    ```
+    GET /api/v1/apps/afko/tables/factory_material_remainder/data?page=1&page_size=100&factory=1203,1204
+    ```
+    """
+    table_name = "factory_material_remainder"
+
+    # Check app access
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to app '{app_name}'"
+        )
+
+    # Check table access
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'"
+        )
+
+    # Get object ID for this table
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No object mapping found for table '{table_name}' in app '{app_name}'"
+        )
+
+    # Get bookmark ID for this table
+    bookmark_id = settings.get_bookmark_id(app_name, table_name)
+
+    # Build selections dictionary for Qlik filtering
+    selections = {}
+    if factory:
+        factory_values = [f.strip() for f in factory.split(',')]
+        selections['Завод'] = factory_values
+
+    if warehouse:
+        warehouse_values = [w.strip() for w in warehouse.split(',')]
+        selections['Склад'] = warehouse_values
+
+    if typeOM:
+        typeOM_values = [t.strip() for t in typeOM.split(',')]
+        selections['Тип ОМ'] = typeOM_values
+
+    # Build filters dictionary for client-side filtering
+    filters = {}
+    if yearMonth:
+        year_month_list = []
+        for ym in yearMonth.split(','):
+            ym = ym.strip()
+            ym_normalized = ym.replace('.', '-')
+            year_month_list.append(ym_normalized)
+        filters['yearMonth'] = year_month_list
+
+    # Build variables dictionary
+    variables = {}
+    if MeasureType:
+        variables['vChooseType'] = MeasureType
+    if Currency:
+        variables['vChooseCur'] = Currency
+
+    data = await app_service.get_object_data(
+        app_name=app_name,
+        object_id=object_id,
+        page=page,
+        page_size=page_size,
+        filters=filters,
+        selections=selections,
+        variables=variables,
+        bookmark_id=bookmark_id
+    )
+
+    return data
+
+
+@router.get("/apps/{app_name}/tables/factory_material_remainder/export")
+async def export_factory_material_remainder_to_excel(
+    app_name: str = Path(..., description="Application name"),
+    factory: Optional[str] = Query(None, description="Filter by factory (Завод field), supports multiple values separated by comma"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (Склад field), supports multiple values separated by comma"),
+    typeOM: Optional[str] = Query(None, description="Filter by OM type (Тип ОМ field), supports multiple values separated by comma"),
+    yearMonth: Optional[str] = Query(None, description="Filter by YearMonth (format: 2024-01 or 2024.01), supports multiple values separated by comma"),
+    MeasureType: Optional[str] = Query(None, description="Measure type (1=qty, 2=amount, 3=amount-qty)"),
+    Currency: Optional[str] = Query(None, description="Currency type (1=ZUD, 2=UZS, 3=ZUDMVP)"),
+    app_service: AppService = Depends(get_app_service),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export factory material remainder data to Excel file.
+
+    **Examples:**
+
+    Export all data for factory 1203:
+    ```
+    GET /api/v1/apps/afko/tables/factory_material_remainder/export?factory=1203
+    ```
+
+    Export with multiple filters:
+    ```
+    GET /api/v1/apps/afko/tables/factory_material_remainder/export?factory=1203&yearMonth=2026-03
+    ```
+    """
+    table_name = "factory_material_remainder"
+    bookmark_id = settings.get_bookmark_id(app_name, table_name)
+
+    # Build selections dictionary
+    selections = {}
+    if factory:
+        factory_values = [f.strip() for f in factory.split(',')]
+        selections['Завод'] = factory_values
+
+    if warehouse:
+        warehouse_values = [w.strip() for w in warehouse.split(',')]
+        selections['Склад'] = warehouse_values
+
+    if typeOM:
+        typeOM_values = [t.strip() for t in typeOM.split(',')]
+        selections['Тип ОМ'] = typeOM_values
+
+    # Build filters dictionary for client-side filtering
+    filters = {}
+    if yearMonth:
+        yearMonth_values = [ym.strip().replace('.', '-') for ym in yearMonth.split(',')]
+        filters['yearMonth'] = yearMonth_values
+
+    # Force full dimension expansion for Excel export (pivot object needs this)
+    filters['_force_session_hypercube'] = True
+
+    # Build variables dictionary
+    variables = {}
+    if MeasureType:
+        variables['vChooseType'] = MeasureType
+    if Currency:
+        variables['vChooseCur'] = Currency
+
+    # Check app access
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to app '{app_name}'"
+        )
+
+    # Check table access
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'"
+        )
+
+    # Get object ID for this table
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No object mapping found for table '{table_name}' in app '{app_name}'"
+        )
+
+    data = await app_service.get_object_data(
+        app_name=app_name,
+        object_id=object_id,
+        page=1,
+        page_size=999999999,
+        filters=filters,
+        selections=selections,
+        variables=variables,
+        bookmark_id=bookmark_id
+    )
+
+    # Create Excel workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Factory Material Remainder"
+
+    rows = data.get('data', [])
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No data found for the given filters")
+
+    headers = list(rows[0].keys())
+
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+
+    for row_idx, row_data in enumerate(rows, start=2):
+        for col_idx, header in enumerate(headers, start=1):
+            value = row_data.get(header, '')
+            ws.cell(row=row_idx, column=col_idx, value=value)
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+    excel_file = BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"factory_material_remainder_{timestamp}.xlsx"
+
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/apps/{app_name}/tables/factory_material_remainder/export_native")
+async def export_factory_material_remainder_native(
+    app_name: str = Path(..., description="Application name"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
+    factory: Optional[str] = Query(None, description="Filter by factory (Завод field), supports multiple values separated by comma"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (Склад field), supports multiple values separated by comma"),
+    typeOM: Optional[str] = Query(None, description="Filter by OM type (Тип ОМ field), supports multiple values separated by comma"),
+    yearMonth: Optional[str] = Query(None, description="Filter by YearMonth (format: 2024-01 or 2024.01), supports multiple values separated by comma"),
+    MeasureType: Optional[str] = Query(None, description="Measure type (1=qty, 2=amount, 3=amount-qty)"),
+    Currency: Optional[str] = Query(None, description="Currency type (1=ZUD, 2=UZS, 3=ZUDMVP)"),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export factory material remainder data using Qlik's native ExportData method (MUCH FASTER).
+
+    This endpoint uses Qlik Sense's built-in ExportData API which can export
+    up to 1 million rows directly to Excel, CSV, TSV, or Parquet format.
+
+    **Supported formats:**
+    - excel (default): Excel .xlsx format
+    - csv: Comma-separated values
+    - tsv: Tab-separated values
+    - parquet: Apache Parquet format (requires Qlik Sense November 2024+ and app-level PARQUET support)
+
+    **Note:** If PARQUET format is not supported by your Qlik version/app, it will automatically
+    fall back to Excel format.
+
+    **This is significantly faster than the regular export endpoint for large datasets.**
+    """
+    # Map file_type parameter to Qlik format codes
+    format_mapping = {
+        "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "csv": ("CSV_C", ".csv", "text/csv"),
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
+    }
+
+    if file_type not in format_mapping:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
+        )
+
+    qlik_format, file_extension, media_type = format_mapping[file_type]
+    table_name = "factory_material_remainder_table"  # Use the flat table object, not pivot
+
+    # Check app access
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to app '{app_name}'"
+        )
+
+    # Check table access (use factory_material_remainder for access control)
+    if not settings.can_access_table(api_key, app_name, "factory_material_remainder"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Your API key does not have access to factory_material_remainder table in app '{app_name}'"
+        )
+
+    # Get object ID for the table object
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No object mapping found for table '{table_name}' in app '{app_name}'"
+        )
+
+    # Get app ID
+    app_id = settings.get_app_id(app_name)
+    if not app_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"App '{app_name}' not found in configuration"
+        )
+
+    # Get bookmark ID
+    bookmark_id = settings.get_bookmark_id(app_name, "factory_material_remainder")
+
+    # Create Qlik Engine client
+    client = QlikEngineClient(settings)
+
+    try:
+        # Connect and open app
+        client.connect()
+        result = client.open_doc(app_id, no_data=False)
+        app_handle = result['qReturn']['qHandle']
+
+        # Apply bookmark if specified
+        if bookmark_id:
+            client.send_request('ApplyBookmark', [bookmark_id], handle=app_handle)
+
+        # Apply variables if specified (must be done before getting object)
+        if MeasureType:
+            client.set_variable_value(app_handle, 'vChooseType', MeasureType)
+
+        if Currency:
+            client.set_variable_value(app_handle, 'vChooseCur', Currency)
+
+        # Apply field selections for filtering
+        if factory:
+            factory_values = [f.strip() for f in factory.split(',')]
+            client.select_in_field(app_handle, 'Завод', factory_values, toggle=False)
+
+        if warehouse:
+            warehouse_values = [w.strip() for w in warehouse.split(',')]
+            client.select_in_field(app_handle, 'Склад', warehouse_values, toggle=False)
+
+        if typeOM:
+            typeOM_values = [t.strip() for t in typeOM.split(',')]
+            client.select_in_field(app_handle, 'Тип ОМ', typeOM_values, toggle=False)
+
+        if yearMonth:
+            yearMonth_values = [ym.strip().replace('.', '-') for ym in yearMonth.split(',')]
+            client.select_in_field(app_handle, 'YearMonth', yearMonth_values, toggle=False)
+
+        # Get object handle (after selections are applied)
+        obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
+        obj_handle = obj_result['qReturn']['qHandle']
+
+        # Reorder dimensions so 'Дата' is the last dimension.
+        # Master measures use GetObjectDimension(Dimensionality()-1) = 'Дата',
+        # which requires 'Дата' to be the last dimension to return values.
+        try:
+            props_result = client.send_request('GetProperties', [], handle=obj_handle)
+            props = props_result.get('qProp', {})
+            cube_def = props.get('qHyperCubeDef', {})
+            dimensions = list(cube_def.get('qDimensions', []))
+
+            date_dim_idx = None
+            for i, dim in enumerate(dimensions):
+                field_defs = dim.get('qDef', {}).get('qFieldDefs', [])
+                if any('Дата' in fd for fd in field_defs):
+                    date_dim_idx = i
+                    break
+
+            if date_dim_idx is not None and date_dim_idx != len(dimensions) - 1:
+                date_dim = dimensions.pop(date_dim_idx)
+                dimensions.append(date_dim)
+                cube_def['qDimensions'] = dimensions
+                props['qHyperCubeDef'] = cube_def
+                session_result = client.send_request('CreateSessionObject', [props], handle=app_handle)
+                if 'qReturn' in session_result and 'qHandle' in session_result['qReturn']:
+                    obj_handle = session_result['qReturn']['qHandle']
+                    logger.info("Using session object with 'Дата' as last dimension for export")
+        except Exception as reorder_error:
+            logger.warning(f"Could not reorder dimensions for export: {reorder_error}, using original object")
+
+        # Use native ExportData method with fallback for unsupported formats
+        export_result = None
+        actual_format = qlik_format
+        actual_extension = file_extension
+        actual_media_type = media_type
+
+        try:
+            export_result = client.export_data(
+                object_handle=obj_handle,
+                file_type=qlik_format,
+                path="/qHyperCubeDef",
+                export_state="P"  # P = Possible values (respects current selections/filters)
+            )
+        except Exception as export_error:
+            # Check if error is "Unsupported file format" (code 3004) for PARQUET
+            if qlik_format == "PARQUET" and "3004" in str(export_error):
+                logger.warning(
+                    f"PARQUET format not supported (error 3004). "
+                    f"Falling back to Excel format. "
+                    f"To enable PARQUET: Add 'SET EnableParquetSupport=1;' to app load script."
+                )
+                # Fallback to Excel
+                actual_format = "OOXML"
+                actual_extension = ".xlsx"
+                actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+                export_result = client.export_data(
+                    object_handle=obj_handle,
+                    file_type=actual_format,
+                    path="/qHyperCubeDef",
+                    export_state="P"  # P = Possible values (respects current selections/filters)
+                )
+            else:
+                # Re-raise if it's a different error
+                raise
+
+        # Get the temporary URL
+        temp_url = export_result.get('qUrl')
+        if not temp_url:
+            raise HTTPException(
+                status_code=500,
+                detail="Qlik did not return a download URL"
+            )
+
+        # Parse the file path from qUrl
+        # Format: /tempcontent/GUID1/GUID2.xlsx?serverNodeId=...
+        from pathlib import Path
+        parts = temp_url.strip('/').split('/')
+        guid_folder = parts[1]
+        filename_with_params = parts[2]
+        filename = filename_with_params.split('?')[0]  # Remove query params
+
+        # Direct filesystem access (when API runs on same server as Qlik)
+        # Standard Qlik TempContent location on Windows
+        base_path = Path("C:/ProgramData/Qlik/Sense/Repository/TempContent")
+        file_path = base_path / guid_folder / filename
+
+        # Check if file exists
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Exported file not found at {file_path}. Ensure API runs on Qlik server."
+            )
+
+        # Read file directly from filesystem
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        # Generate filename for download
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"factory_material_remainder_{timestamp}{actual_extension}"
+
+        # Return the file as streaming response
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=actual_media_type,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Export failed: {str(e)}"
+        )
+    finally:
+        # Close connection
+        try:
+            client.close()
+        except:
+            pass
+
+
 @router.get("/apps/{app_name}/tables/application_status/data")
 async def get_application_status_data(
     app_name: str = Path(..., description="Application name"),
@@ -653,6 +1149,280 @@ async def get_application_status_data(
     return data
 
 
+@router.get("/apps/{app_name}/tables/stock_qty/export_native")
+async def export_stock_qty_native(
+    app_name: str = Path(..., description="Application name"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
+    factory: Optional[str] = Query(None, description="Filter by factory (PRCTR field)"),
+    warehouse: Optional[str] = Query(None, description="Filter by warehouse (LGORT field)"),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export stock quantity data using Qlik's native ExportData method.
+
+    **Supported formats:** excel (default), csv, tsv, parquet
+
+    **Examples:**
+    ```
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?factory=1203
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?factory=1203&warehouse=P210
+    GET /api/v1/apps/Stock/tables/stock_qty/export_native?file_type=csv&factory=1203
+    ```
+    """
+    format_mapping = {
+        "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "csv": ("CSV_C", ".csv", "text/csv"),
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
+    }
+
+    if file_type not in format_mapping:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
+        )
+
+    qlik_format, file_extension, media_type = format_mapping[file_type]
+    table_name = "stock_qty"
+
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to app '{app_name}'")
+
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'")
+
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(status_code=404, detail=f"No object mapping found for table '{table_name}' in app '{app_name}'")
+
+    app_id = settings.get_app_id(app_name)
+    if not app_id:
+        raise HTTPException(status_code=404, detail=f"App '{app_name}' not found in configuration")
+
+    client = QlikEngineClient(settings)
+
+    try:
+        client.connect()
+        result = client.open_doc(app_id, no_data=False)
+        app_handle = result['qReturn']['qHandle']
+
+        # Apply field selections for filtering
+        if factory:
+            factory_values = [f.strip() for f in factory.split(',')]
+            client.select_in_field(app_handle, 'PRCTR', factory_values, toggle=False)
+
+        if warehouse:
+            warehouse_values = [w.strip() for w in warehouse.split(',')]
+            client.select_in_field(app_handle, 'LGORT', warehouse_values, toggle=False)
+
+        # Get object handle
+        obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
+        obj_handle = obj_result['qReturn']['qHandle']
+
+        # Export with fallback for unsupported formats
+        export_result = None
+        actual_format = qlik_format
+        actual_extension = file_extension
+        actual_media_type = media_type
+
+        try:
+            export_result = client.export_data(
+                object_handle=obj_handle,
+                file_type=qlik_format,
+                path="/qHyperCubeDef",
+                export_state="P"
+            )
+        except Exception as export_error:
+            if qlik_format == "PARQUET" and "3004" in str(export_error):
+                logger.warning(f"PARQUET format not supported, falling back to Excel")
+                actual_format = "OOXML"
+                actual_extension = ".xlsx"
+                actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                export_result = client.export_data(
+                    object_handle=obj_handle,
+                    file_type=actual_format,
+                    path="/qHyperCubeDef",
+                    export_state="P"
+                )
+            else:
+                raise
+
+        temp_url = export_result.get('qUrl')
+        if not temp_url:
+            raise HTTPException(status_code=500, detail="Qlik did not return a download URL")
+
+        from pathlib import Path as FilePath
+        parts = temp_url.strip('/').split('/')
+        guid_folder = parts[1]
+        filename = parts[2].split('?')[0]
+
+        base_path = FilePath("C:/ProgramData/Qlik/Sense/Repository/TempContent")
+        file_path = base_path / guid_folder / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=500, detail=f"Exported file not found at {file_path}. Ensure API runs on Qlik server.")
+
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"stock_qty_{timestamp}{actual_extension}"
+
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=actual_media_type,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    finally:
+        try:
+            client.close()
+        except:
+            pass
+
+
+@router.get("/apps/{app_name}/tables/application_status/export_native")
+async def export_application_status_native(
+    app_name: str = Path(..., description="Application name"),
+    file_type: str = Query("excel", description="Export format: excel, csv, tsv, or parquet"),
+    yearmonth: Optional[str] = Query(None, description="Filter by YearMonth (format: 2026-01 or 2026.01), supports multiple values separated by comma"),
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Export application status data using Qlik's native ExportData method.
+
+    **Supported formats:** excel (default), csv, tsv, parquet
+
+    **Examples:**
+    ```
+    GET /api/v1/apps/Stock/tables/application_status/export_native
+    GET /api/v1/apps/Stock/tables/application_status/export_native?yearmonth=2024-01
+    GET /api/v1/apps/Stock/tables/application_status/export_native?yearmonth=2024-01,2024-02&file_type=csv
+    ```
+    """
+    format_mapping = {
+        "excel": ("OOXML", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "csv": ("CSV_C", ".csv", "text/csv"),
+        "tsv": ("CSV_T", ".tsv", "text/tab-separated-values"),
+        "parquet": ("PARQUET", ".parquet", "application/octet-stream")
+    }
+
+    if file_type not in format_mapping:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file_type '{file_type}'. Supported: excel, csv, tsv, parquet"
+        )
+
+    qlik_format, file_extension, media_type = format_mapping[file_type]
+    table_name = "application_status"
+
+    if not settings.can_access_app(api_key, app_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to app '{app_name}'")
+
+    if not settings.can_access_table(api_key, app_name, table_name):
+        raise HTTPException(status_code=403, detail=f"Your API key does not have access to table '{table_name}' in app '{app_name}'")
+
+    object_id = settings.get_object_id_for_table(app_name, table_name)
+    if not object_id:
+        raise HTTPException(status_code=404, detail=f"No object mapping found for table '{table_name}' in app '{app_name}'")
+
+    app_id = settings.get_app_id(app_name)
+    if not app_id:
+        raise HTTPException(status_code=404, detail=f"App '{app_name}' not found in configuration")
+
+    bookmark_id = settings.get_bookmark_id(app_name, table_name)
+
+    client = QlikEngineClient(settings)
+
+    try:
+        client.connect()
+        result = client.open_doc(app_id, no_data=False)
+        app_handle = result['qReturn']['qHandle']
+
+        # Apply bookmark if available
+        if bookmark_id:
+            client.send_request('ApplyBookmark', [bookmark_id], handle=app_handle)
+
+        # Apply YearMonth selection
+        if yearmonth:
+            yearmonth_values = [ym.strip().replace('.', '-') for ym in yearmonth.split(',')]
+            client.select_in_field(app_handle, 'YearMonth', yearmonth_values, toggle=False)
+
+        # Get object handle
+        obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
+        obj_handle = obj_result['qReturn']['qHandle']
+
+        # Export with fallback for unsupported formats
+        export_result = None
+        actual_format = qlik_format
+        actual_extension = file_extension
+        actual_media_type = media_type
+
+        try:
+            export_result = client.export_data(
+                object_handle=obj_handle,
+                file_type=qlik_format,
+                path="/qHyperCubeDef",
+                export_state="P"
+            )
+        except Exception as export_error:
+            if qlik_format == "PARQUET" and "3004" in str(export_error):
+                logger.warning(f"PARQUET format not supported, falling back to Excel")
+                actual_format = "OOXML"
+                actual_extension = ".xlsx"
+                actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                export_result = client.export_data(
+                    object_handle=obj_handle,
+                    file_type=actual_format,
+                    path="/qHyperCubeDef",
+                    export_state="P"
+                )
+            else:
+                raise
+
+        temp_url = export_result.get('qUrl')
+        if not temp_url:
+            raise HTTPException(status_code=500, detail="Qlik did not return a download URL")
+
+        from pathlib import Path as FilePath
+        parts = temp_url.strip('/').split('/')
+        guid_folder = parts[1]
+        filename = parts[2].split('?')[0]
+
+        base_path = FilePath("C:/ProgramData/Qlik/Sense/Repository/TempContent")
+        file_path = base_path / guid_folder / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=500, detail=f"Exported file not found at {file_path}. Ensure API runs on Qlik server.")
+
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"application_status_{timestamp}{actual_extension}"
+
+        return StreamingResponse(
+            BytesIO(file_content),
+            media_type=actual_media_type,
+            headers={"Content-Disposition": f"attachment; filename={download_filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    finally:
+        try:
+            client.close()
+        except:
+            pass
+
+
 @router.get("/apps/{app_name}/tables/{table_name}/data")
 async def get_table_data_with_measures(
     app_name: str = Path(..., description="Application name"),
@@ -720,13 +1490,13 @@ async def get_table_data_with_measures(
             detail=f"No object mapping found for table '{table_name}' in app '{app_name}'"
         )
 
-    # Build filters dictionary
+    # Build selections dictionary for Qlik-side filtering (server-side, efficient pagination)
     # Map query parameters to actual Qlik field names
-    filters = {}
+    selections = {}
     if factory:
-        filters['PRCTR'] = factory  # PRCTR is the factory field in Qlik
+        selections['PRCTR'] = [factory]  # PRCTR is the factory field in Qlik
     if warehouse:
-        filters['LGORT'] = warehouse  # LGORT is the warehouse field in Qlik
+        selections['LGORT'] = [warehouse]  # LGORT is the warehouse field in Qlik
 
-    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters, selections={}, variables={})
+    data = await app_service.get_object_data(app_name, object_id, page, page_size, filters={}, selections=selections, variables={})
     return data

@@ -202,20 +202,21 @@ class QlikEngineClient(BaseClient):
             else:
                 return self.send_request("OpenDoc", [app_id])
         except Exception as e:
-            # If app is already open, try to get existing handle
+            # If app is already open, get the handle of the active document
             if "already open" in str(e).lower():
                 try:
-                    doc_list = self.get_doc_list()
-                    for doc in doc_list:
-                        if doc.get("qDocId") == app_id:
-                            return {
-                                "qReturn": {
-                                    "qHandle": doc.get("qHandle", -1),
-                                    "qGenericId": app_id
-                                }
+                    active_result = self.send_request("GetActiveDoc")
+                    active_handle = active_result.get("qReturn", {}).get("qHandle")
+                    if active_handle is not None and active_handle != -1:
+                        logger.info(f"App '{app_id}' already open, using active doc handle {active_handle}")
+                        return {
+                            "qReturn": {
+                                "qHandle": active_handle,
+                                "qGenericId": app_id
                             }
-                except:
-                    pass
+                        }
+                except Exception as active_err:
+                    logger.warning(f"GetActiveDoc failed after 'already open': {active_err}")
             raise e
 
     def close_doc(self, app_handle: int) -> bool:
@@ -375,7 +376,7 @@ class QlikEngineClient(BaseClient):
                 return []
 
             sheet_list_handle = create_result["qReturn"]["qHandle"]
-            layout_result = self.send_request("GetLayout", [], handle=sheet_list_handle)
+            layout_result = self.send_request("GetLayout", handle=sheet_list_handle)
             if "qLayout" not in layout_result or "qAppObjectList" not in layout_result["qLayout"]:
                 logger.warning(f"No sheet list in layout: {layout_result}")
                 return []
@@ -663,7 +664,7 @@ class QlikEngineClient(BaseClient):
                 except Exception:
                     pass
 
-            layout = self.send_request("GetLayout", [], handle=cube_handle)
+            layout = self.send_request("GetLayout", handle=cube_handle)
 
             # Restore original timeout
             if extended_timeout > original_timeout:
@@ -788,7 +789,7 @@ class QlikEngineClient(BaseClient):
 
             list_handle = result["qReturn"]["qHandle"]
 
-            layout = self.send_request("GetLayout", [], handle=list_handle)
+            layout = self.send_request("GetLayout", handle=list_handle)
 
             if "qLayout" not in layout or "qListObject" not in layout["qLayout"]:
                 try:
@@ -867,7 +868,7 @@ class QlikEngineClient(BaseClient):
                             if "qReturn" in measure_result:
                                 measure_handle = measure_result["qReturn"]["qHandle"]
                                 if measure_handle:
-                                    layout_result = self.send_request("GetLayout", [], handle=measure_handle)
+                                    layout_result = self.send_request("GetLayout", handle=measure_handle)
                                     if "qLayout" in layout_result:
                                         layout = layout_result["qLayout"]
                                         measure_data = {
@@ -1055,7 +1056,21 @@ class QlikEngineClient(BaseClient):
             if not field_handle:
                 raise Exception(f"Could not get handle for field '{field_name}'")
 
-            # Select values.
+            # Build field values with both text and numeric representations.
+            # Qlik's SelectValues can silently fail (qReturn=false) when a
+            # numeric field is matched by qText alone.  Passing qIsNumeric
+            # and qNumber for values that look numeric ensures the match.
+            field_values = []
+            for value in values:
+                fv = {"qText": str(value)}
+                try:
+                    num = float(value)
+                    fv["qIsNumeric"] = True
+                    fv["qNumber"] = num
+                except (ValueError, TypeError):
+                    pass
+                field_values.append(fv)
+
             # softLock=True: allow this selection to override soft-locked fields
             # (fields locked by a bookmark).  Without this, a SelectValues call
             # on a field that the bookmark locked silently returns qReturn=False
@@ -1063,7 +1078,7 @@ class QlikEngineClient(BaseClient):
             result = self.send_request(
                 "SelectValues",
                 [
-                    [{"qText": str(value)} for value in values],
+                    field_values,
                     toggle,
                     True  # softLock = True — override bookmark locks
                 ],
@@ -1257,7 +1272,7 @@ class QlikEngineClient(BaseClient):
             q_no_of_left_dims = hc_def.get("qNoOfLeftDims", n_dims)
 
             # GetLayout to know total row count (very fast — reads cached state)
-            layout = self.send_request("GetLayout", [], handle=obj_handle)
+            layout = self.send_request("GetLayout", handle=obj_handle)
             hc = layout.get("qLayout", {}).get("qHyperCube", {})
             total_rows = hc.get("qSize", {}).get("qcy", 0)
 
