@@ -432,12 +432,13 @@ async def export_factory_data_native(
         if bookmark_id:
             client.send_request('ApplyBookmark', [bookmark_id], handle=app_handle)
 
-        # Apply variables if specified (must be done before getting object)
-        if MeasureType:
-            client.set_variable_value(app_handle, 'vChooseType', MeasureType)
-
-        if Currency:
-            client.set_variable_value(app_handle, 'vChooseCur', Currency)
+        # Apply variables (must be done before getting object). Always set them
+        # explicitly — the chart's measures reference $(vChooseType)/$(vChooseCur),
+        # so leaving them unset causes the engine to abort the export
+        # ('Request aborted', code 15). Default to '1' (qty / ZUD) when caller
+        # didn't pass values.
+        client.set_variable_value(app_handle, 'vChooseType', MeasureType or '1')
+        client.set_variable_value(app_handle, 'vChooseCur', Currency or '1')
 
         # Apply field selections for filtering
         if factory:
@@ -909,12 +910,13 @@ async def export_factory_material_remainder_native(
         if bookmark_id:
             client.send_request('ApplyBookmark', [bookmark_id], handle=app_handle)
 
-        # Apply variables if specified (must be done before getting object)
-        if MeasureType:
-            client.set_variable_value(app_handle, 'vChooseType', MeasureType)
-
-        if Currency:
-            client.set_variable_value(app_handle, 'vChooseCur', Currency)
+        # Apply variables (must be done before getting object). Always set them
+        # explicitly — the chart's measures reference $(vChooseType)/$(vChooseCur),
+        # so leaving them unset causes the engine to abort the export
+        # ('Request aborted', code 15). Default to '1' (qty / ZUD) when caller
+        # didn't pass values.
+        client.set_variable_value(app_handle, 'vChooseType', MeasureType or '1')
+        client.set_variable_value(app_handle, 'vChooseCur', Currency or '1')
 
         # Apply field selections for filtering
         if factory:
