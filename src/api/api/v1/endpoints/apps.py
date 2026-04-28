@@ -424,7 +424,10 @@ async def export_factory_data_native(
 
     try:
         # Connect and open app
-        client.connect()
+        # Connect to the per-app WebSocket URL so each request gets a session
+        # scoped to its target app. Avoids cross-request 'App already open'
+        # interference between e.g. /Stock/... and /afko/... endpoints.
+        client.connect(app_id)
         result = client.open_doc(app_id, no_data=False)
         app_handle = result['qReturn']['qHandle']
 
@@ -902,7 +905,10 @@ async def export_factory_material_remainder_native(
 
     try:
         # Connect and open app
-        client.connect()
+        # Connect to the per-app WebSocket URL so each request gets a session
+        # scoped to its target app. Avoids cross-request 'App already open'
+        # interference between e.g. /Stock/... and /afko/... endpoints.
+        client.connect(app_id)
         result = client.open_doc(app_id, no_data=False)
         app_handle = result['qReturn']['qHandle']
 
@@ -1216,7 +1222,10 @@ async def export_stock_qty_native(
     client = QlikEngineClient(settings)
 
     try:
-        client.connect()
+        # Connect to the per-app WebSocket URL so each request gets a session
+        # scoped to its target app. Avoids cross-request 'App already open'
+        # interference between e.g. /Stock/... and /afko/... endpoints.
+        client.connect(app_id)
         result = client.open_doc(app_id, no_data=False)
         app_handle = result['qReturn']['qHandle']
 
@@ -1356,7 +1365,10 @@ async def export_application_status_native(
     client = QlikEngineClient(settings)
 
     try:
-        client.connect()
+        # Connect to the per-app WebSocket URL so each request gets a session
+        # scoped to its target app. Avoids cross-request 'App already open'
+        # interference between e.g. /Stock/... and /afko/... endpoints.
+        client.connect(app_id)
         result = client.open_doc(app_id, no_data=False)
         app_handle = result['qReturn']['qHandle']
 

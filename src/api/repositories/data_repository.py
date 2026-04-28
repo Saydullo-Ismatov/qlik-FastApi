@@ -58,8 +58,8 @@ class DataRepository(BaseRepository):
             selections_applied = False
             app_handle = -1
 
-            # Connect to engine
-            self.engine_client.connect()
+            # Connect to engine (per-app URL isolates session)
+            self.engine_client.connect(app_id)
 
             try:
                 # Open the app

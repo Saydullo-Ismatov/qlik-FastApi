@@ -125,8 +125,8 @@ class AppRepository(BaseRepository):
         try:
             logger.info(f"Fetching fields for app ID '{app_id}'")
 
-            # Connect to engine
-            self.engine_client.connect()
+            # Connect to engine (per-app URL isolates session)
+            self.engine_client.connect(app_id)
 
             try:
                 # Open the app
@@ -171,8 +171,8 @@ class AppRepository(BaseRepository):
         try:
             logger.info(f"Fetching tables for app ID '{app_id}'")
 
-            # Connect to engine
-            self.engine_client.connect()
+            # Connect to engine (per-app URL isolates session)
+            self.engine_client.connect(app_id)
 
             try:
                 # Open the app
@@ -237,8 +237,8 @@ class AppRepository(BaseRepository):
         try:
             logger.info(f"Fetching object definition for '{object_id}' in app '{app_id}'")
 
-            # Connect to engine
-            self.engine_client.connect()
+            # Connect to engine (per-app URL isolates session)
+            self.engine_client.connect(app_id)
 
             try:
                 # Open the app
@@ -336,7 +336,7 @@ class AppRepository(BaseRepository):
             if bookmark_id:
                 logger.info(f"Will apply bookmark '{bookmark_id}' before fetching")
 
-            self.engine_client.connect()
+            self.engine_client.connect(app_id)
 
             try:
                 result = self.engine_client.open_doc(app_id, no_data=False)
@@ -397,8 +397,8 @@ class AppRepository(BaseRepository):
             if variables:
                 logger.info(f"Will set Qlik variables: {variables}")
 
-            # Connect to engine
-            self.engine_client.connect()
+            # Connect to engine (per-app URL isolates session)
+            self.engine_client.connect(app_id)
 
             try:
                 # Open the app

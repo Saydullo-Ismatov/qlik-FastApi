@@ -41,21 +41,35 @@ class QlikEngineClient(BaseClient):
         Connect to Engine API via WebSocket.
 
         Args:
-            app_id: Optional application ID (not used in connection, kept for compatibility)
+            app_id: If provided, connect to the app-specific URL (/app/<app-id>),
+                which scopes the engine session to a single app and avoids
+                cross-app 'App already open' interference between requests.
 
         Raises:
             ConnectionError: If connection fails after all retry attempts
         """
         # Try different WebSocket endpoints
         server_host = self.settings.QLIK_SENSE_HOST
+        port = self.settings.QLIK_ENGINE_PORT
 
-        # Order and count of endpoints controlled by retries setting
-        endpoints_all = [
-            f"wss://{server_host}:{self.settings.QLIK_ENGINE_PORT}/app/engineData",
-            f"wss://{server_host}:{self.settings.QLIK_ENGINE_PORT}/app",
-            f"ws://{server_host}:{self.settings.QLIK_ENGINE_PORT}/app/engineData",
-            f"ws://{server_host}:{self.settings.QLIK_ENGINE_PORT}/app",
-        ]
+        # When app_id is given, prefer the per-app URL: cert-authenticated
+        # sessions are shared per user, so a generic /app/engineData endpoint
+        # leaks doc state across requests. The per-app URL gives each request
+        # an isolated session for its target app.
+        if app_id:
+            endpoints_all = [
+                f"wss://{server_host}:{port}/app/{app_id}",
+                f"ws://{server_host}:{port}/app/{app_id}",
+                f"wss://{server_host}:{port}/app/engineData",
+                f"ws://{server_host}:{port}/app/engineData",
+            ]
+        else:
+            endpoints_all = [
+                f"wss://{server_host}:{port}/app/engineData",
+                f"wss://{server_host}:{port}/app",
+                f"ws://{server_host}:{port}/app/engineData",
+                f"ws://{server_host}:{port}/app",
+            ]
         endpoints_to_try = endpoints_all[: max(1, min(self.ws_retries, len(endpoints_all)))]
 
         # Setup SSL context
