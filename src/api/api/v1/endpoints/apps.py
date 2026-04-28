@@ -1209,14 +1209,17 @@ async def export_stock_qty_native(
         result = client.open_doc(app_id, no_data=False)
         app_handle = result['qReturn']['qHandle']
 
-        # Apply field selections for filtering
+        # Apply field selections for filtering.
+        # Use select_values (not select_in_field) — it sets qIsNumeric/qNumber for
+        # numeric values and uses softLock=True. PRCTR is numeric, so the simpler
+        # select_in_field path silently fails (qReturn=false).
         if factory:
             factory_values = [f.strip() for f in factory.split(',')]
-            client.select_in_field(app_handle, 'PRCTR', factory_values, toggle=False)
+            client.select_values(app_handle, 'PRCTR', factory_values, toggle=False)
 
         if warehouse:
             warehouse_values = [w.strip() for w in warehouse.split(',')]
-            client.select_in_field(app_handle, 'LGORT', warehouse_values, toggle=False)
+            client.select_values(app_handle, 'LGORT', warehouse_values, toggle=False)
 
         # Get object handle
         obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
