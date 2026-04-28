@@ -1220,6 +1220,67 @@ async def export_stock_qty_native(
         obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
         obj_handle = obj_result['qReturn']['qHandle']
 
+        # The stock_qty object is a pivot table — calling ExportData directly on it
+        # produces empty cells for the collapsed-row dimensions. Mirror the
+        # non-native data path: build a flat session hypercube (qMode "S") with
+        # the same dimensions/measures, then export from that.
+        layout = client.send_request('GetLayout', handle=obj_handle)
+        hc_layout = layout.get('qLayout', {}).get('qHyperCube', {})
+        qsize = hc_layout.get('qSize', {})
+        dim_count = len(hc_layout.get('qDimensionInfo', []))
+        is_collapsed_pivot = qsize.get('qcx', 0) < dim_count and dim_count > 0
+
+        export_handle = obj_handle
+        if is_collapsed_pivot:
+            logger.info(
+                f"stock_qty layout is a collapsed pivot ({qsize.get('qcx', 0)} visible cols, "
+                f"{dim_count} dimensions) — building flat session hypercube for export"
+            )
+
+            dim_defs = []
+            for dim_info in hc_layout.get('qDimensionInfo', []):
+                group_defs = dim_info.get('qGroupFieldDefs', [])
+                fallback = dim_info.get('qFallbackTitle', '')
+                field = group_defs[0] if group_defs else fallback
+                if field:
+                    dim_defs.append((field, fallback))
+
+            properties = client.send_request('GetFullPropertyTree', handle=obj_handle)
+            hc_def = properties.get('qPropEntry', {}).get('qProperty', {}).get('qHyperCubeDef', {})
+
+            meas_defs = []
+            for meas_def in hc_def.get('qMeasures', []):
+                qdef = meas_def.get('qDef', {})
+                if meas_def.get('qLibraryId') or qdef.get('qDef'):
+                    meas_defs.append(meas_def)
+
+            for i, meas_info in enumerate(hc_layout.get('qMeasureInfo', [])):
+                label = meas_info.get('qFallbackTitle', '')
+                if label and i >= len(meas_defs):
+                    meas_defs.append({"qDef": {"qDef": f"[{label}]", "qLabel": label}})
+
+            session_obj_def = {
+                "qInfo": {"qType": "table"},
+                "qHyperCubeDef": {
+                    "qDimensions": [
+                        {"qDef": {"qFieldDefs": [field], "qFieldLabels": [label]}}
+                        for field, label in dim_defs
+                    ],
+                    "qMeasures": meas_defs,
+                    "qMode": "S",
+                    "qSuppressZero": False,
+                    "qSuppressMissing": False,
+                    "qInitialDataFetch": [{"qTop": 0, "qLeft": 0, "qHeight": 0, "qWidth": 0}],
+                },
+            }
+
+            session_obj = client.send_request('CreateSessionObject', [session_obj_def], handle=app_handle)
+            export_handle = session_obj['qReturn']['qHandle']
+            logger.info(
+                f"Session hypercube created with {len(dim_defs)} dimensions and "
+                f"{len(meas_defs)} measures for export (handle {export_handle})"
+            )
+
         # Export with fallback for unsupported formats
         export_result = None
         actual_format = qlik_format
@@ -1228,7 +1289,7 @@ async def export_stock_qty_native(
 
         try:
             export_result = client.export_data(
-                object_handle=obj_handle,
+                object_handle=export_handle,
                 file_type=qlik_format,
                 path="/qHyperCubeDef",
                 export_state="P"
@@ -1240,7 +1301,7 @@ async def export_stock_qty_native(
                 actual_extension = ".xlsx"
                 actual_media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 export_result = client.export_data(
-                    object_handle=obj_handle,
+                    object_handle=export_handle,
                     file_type=actual_format,
                     path="/qHyperCubeDef",
                     export_state="P"
