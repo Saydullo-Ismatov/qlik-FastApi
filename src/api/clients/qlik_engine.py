@@ -196,28 +196,46 @@ class QlikEngineClient(BaseClient):
         Raises:
             Exception: If opening document fails
         """
-        try:
+        def _do_open():
             if no_data:
                 return self.send_request("OpenDoc", [app_id, "", "", "", True])
-            else:
-                return self.send_request("OpenDoc", [app_id])
+            return self.send_request("OpenDoc", [app_id])
+
+        try:
+            return _do_open()
         except Exception as e:
-            # If app is already open, get the handle of the active document
-            if "already open" in str(e).lower():
-                try:
-                    active_result = self.send_request("GetActiveDoc")
-                    active_handle = active_result.get("qReturn", {}).get("qHandle")
-                    if active_handle is not None and active_handle != -1:
-                        logger.info(f"App '{app_id}' already open, using active doc handle {active_handle}")
-                        return {
-                            "qReturn": {
-                                "qHandle": active_handle,
-                                "qGenericId": app_id
-                            }
-                        }
-                except Exception as active_err:
-                    logger.warning(f"GetActiveDoc failed after 'already open': {active_err}")
-            raise e
+            if "already open" not in str(e).lower():
+                raise
+
+            # Engine session has a doc open. Find out which one — it may be a
+            # different app from a previous request (cert-auth sessions are
+            # shared per-user, so docs persist across HTTP requests).
+            try:
+                active_result = self.send_request("GetActiveDoc")
+                active_qreturn = active_result.get("qReturn", {})
+                active_handle = active_qreturn.get("qHandle")
+                active_app_id = active_qreturn.get("qGenericId", "")
+            except Exception as active_err:
+                logger.warning(f"GetActiveDoc failed after 'already open': {active_err}")
+                raise e
+
+            if active_handle is None or active_handle == -1:
+                raise e
+
+            if active_app_id == app_id:
+                logger.info(f"App '{app_id}' already open, using active doc handle {active_handle}")
+                return {"qReturn": {"qHandle": active_handle, "qGenericId": app_id}}
+
+            # Different app is active. Close it and retry OpenDoc.
+            logger.info(
+                f"Engine session has '{active_app_id}' open (handle {active_handle}); "
+                f"closing it before opening '{app_id}'"
+            )
+            try:
+                self.send_request("CloseDoc", [], handle=active_handle)
+            except Exception as close_err:
+                logger.warning(f"CloseDoc on stale active doc failed: {close_err}")
+            return _do_open()
 
     def close_doc(self, app_handle: int) -> bool:
         """

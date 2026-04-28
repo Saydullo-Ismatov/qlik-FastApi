@@ -458,7 +458,16 @@ async def export_factory_data_native(
 
         # Get object handle (after selections are applied)
         obj_result = client.send_request('GetObject', [object_id], handle=app_handle)
-        obj_handle = obj_result['qReturn']['qHandle']
+        obj_handle = obj_result.get('qReturn', {}).get('qHandle')
+        if not obj_handle or obj_handle == -1:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Qlik object '{object_id}' not found in app '{app_name}'. "
+                    f"The app may have been republished and the object GUID changed. "
+                    f"Update TABLE_OBJECT_MAPPINGS_JSON for '{app_name}.{table_name}'."
+                ),
+            )
 
         # Use native ExportData method with fallback for unsupported formats
         export_result = None
