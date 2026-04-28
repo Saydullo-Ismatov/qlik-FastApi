@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stock App — Roadmap (stock_qty & application_status)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #f4f6f8;
+    color: #222;
+  }
+  header {
+    background: linear-gradient(90deg, #2e9e4f, #1f6fb2);
+    color: white;
+    padding: 18px 24px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header p  { margin: 0; opacity: 0.9; font-size: 14px; }
+
+  .meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .meta span { background: rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 12px; }
+
+  h2 {
+    font-size: 16px;
+    margin: 28px 0 12px;
+    color: #2e9e4f;
+    border-bottom: 2px solid #2e9e4f;
+    padding-bottom: 6px;
+  }
+
+  /* Grid for done / todo columns */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .card h3 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card.done h3 { color: #2e9e4f; }
+  .card.todo h3 { color: #b8860b; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+  }
+  .tag.done  { background: #2e9e4f; }
+  .tag.todo  { background: #d9a417; }
+
+  ul { margin: 0; padding-left: 0; list-style: none; }
+  li {
+    padding: 8px 0 8px 26px;
+    font-size: 13px;
+    line-height: 1.5;
+    border-bottom: 1px dashed #eee;
+    position: relative;
+  }
+  li:last-child { border: none; }
+  li.done::before {
+    content: "✓";
+    position: absolute;
+    left: 4px;
+    color: #2e9e4f;
+    font-weight: bold;
+  }
+  li.todo::before {
+    content: "▢";
+    position: absolute;
+    left: 4px;
+    color: #b8860b;
+    font-weight: bold;
+  }
+  li strong { color: #222; }
+  li .sub { color: #666; font-size: 12px; display: block; margin-top: 2px; }
+
+  /* Gantt timeline */
+  .gantt {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow-x: auto;
+  }
+  .gantt table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 1000px;
+    font-size: 12px;
+  }
+  .gantt th, .gantt td {
+    border: 1px solid #e5e5e5;
+    padding: 0;
+    text-align: center;
+    height: 34px;
+  }
+  .gantt th {
+    background: #2e9e4f;
+    color: white;
+    padding: 6px 4px;
+    font-weight: 600;
+  }
+  .gantt th.week { background: #1f6fb2; }
+  .gantt td.task-name {
+    text-align: left;
+    padding: 6px 10px;
+    background: #f9fafb;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 260px;
+  }
+  .gantt td.task-name small { display: block; font-weight: 400; color: #666; font-size: 11px; }
+
+  .bar {
+    height: 20px;
+    border-radius: 4px;
+    color: white;
+    font-size: 11px;
+    line-height: 20px;
+    padding: 0 8px;
+    margin: 7px 2px;
+  }
+  .bar-qlik     { background: #2e9e4f; }
+  .bar-savdo    { background: #1f6fb2; }
+  .bar-plan     { background: #6b6b6b; }
+  .bar-test     { background: #e67e22; }
+  .bar-refactor { background: #8e44ad; }
+
+  .owners {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .owner-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+
+  .phase-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 16px 0 24px;
+  }
+  .phase {
+    background: white;
+    border-radius: 8px;
+    padding: 14px 16px;
+    border-left: 4px solid;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .phase h4 { margin: 0 0 6px; font-size: 13px; }
+  .phase .dates { font-size: 11px; color: #666; }
+  .phase p { margin: 8px 0 0; font-size: 12px; line-height: 1.5; }
+  .phase.p1 { border-color: #8e44ad; }
+  .phase.p2 { border-color: #2e9e4f; }
+  .phase.p3 { border-color: #1f6fb2; }
+
+  footer {
+    margin-top: 28px;
+    padding: 14px 18px;
+    background: white;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #555;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  footer b { color: #222; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Stock App — Roadmap</h1>
+  <p>Tables: <b>stock_qty</b> &amp; <b>application_status</b></p>
+  <div class="meta">
+    <span>Start: 22 Apr 2026</span>
+    <span>Target completion: 13 May 2026 (≈ 3 weeks)</span>
+    <span>Ownership: Qlik → Plan Dept (customer) → Savdo (testing)</span>
+  </div>
+</header>
+
+<!-- ============== COMPLETED / TO DO ============== -->
+<div class="grid">
+
+  <!-- DONE -->
+  <div class="card done">
+    <h3><span class="tag done">DONE</span> What has been completed</h3>
+    <ul>
+      <li class="done"><strong>Added <code>export_native</code> endpoints</strong> for stock_qty and application_status tables
+        <span class="sub">Supports excel / csv / tsv / parquet via Qlik's native <code>ExportData</code></span>
+      </li>
+      <li class="done"><strong>Fixed <code>GetLayout</code> API error</strong>
+        <span class="sub">WebSocket recv timeout increased (5× base) for large layouts</span>
+      </li>
+      <li class="done"><strong>Optimized stock app pagination</strong>
+        <span class="sub">Session hypercube reuse, faster paging on large datasets</span>
+      </li>
+      <li class="done"><strong>Fixed <code>SelectValues</code> numeric field handling</strong>
+        <span class="sub">Session hypercube filtering now works for numeric dimensions</span>
+      </li>
+      <li class="done"><strong>Stock app blank-measure bug fixed</strong>
+        <span class="sub">Field selection issues that produced empty rows resolved</span>
+      </li>
+      <li class="done"><strong>Parquet fallback logic</strong>
+        <span class="sub">Auto-fallback to Excel on Qlik error 3004</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- TO DO -->
+  <div class="card todo">
+    <h3><span class="tag todo">TO DO</span> What still needs to be done</h3>
+    <ul>
+      <li class="todo"><strong>Refactor project structure — isolate apps</strong>
+        <span class="sub">Each app (stock / factory_data / material_remainder / application_status) must live in its own module so they no longer interfere with one another. Shared code into a common layer; per-app endpoints, services, repos decoupled.</span>
+      </li>
+      <li class="todo"><strong>Implement <code>export_native</code> with ALL filters</strong>
+        <span class="sub">Filters are currently not applied to native Qlik export. Must honour selections (field filters, multi-select), variables (vChooseType etc.), and bookmarks — for both stock_qty and application_status.</span>
+      </li>
+      <li class="todo"><strong>Internal data-correctness testing (Qlik team)</strong>
+        <span class="sub">Verify exported data is complete and identical to what Qlik Sense itself returns under the same filters. Row counts, totals, edge filters, empty selections.</span>
+      </li>
+      <li class="todo"><strong>Hand-off to Savdo for acceptance testing</strong>
+        <span class="sub">Only after internal verification passes. Savdo runs the test conditions (data match, functional correctness, refresh cadence).</span>
+      </li>
+      <li class="todo"><strong>UAT + project close-out</strong>
+        <span class="sub">Plan Department demo &amp; sign-off → Принятие Гранта.</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============== PHASE SUMMARY ============== -->
+<h2>Phases</h2>
+<div class="phase-summary">
+  <div class="phase p1">
+    <h4>Phase 1 — Refactor &amp; Isolation</h4>
+    <div class="dates">22 Apr – 28 Apr 2026</div>
+    <p>Restructure code so each app is self-contained. No more cross-app side effects when extending or fixing one of them.</p>
+  </div>
+  <div class="phase p2">
+    <h4>Phase 2 — export_native with filters</h4>
+    <div class="dates">29 Apr – 06 May 2026</div>
+    <p>Apply selections, variables &amp; bookmarks to native Qlik export for both tables. Internal self-testing of data correctness immediately after.</p>
+  </div>
+  <div class="phase p3">
+    <h4>Phase 3 — Savdo testing &amp; close-out</h4>
+    <div class="dates">07 May – 13 May 2026</div>
+    <p>Savdo acceptance tests + fixes on any found issues → Plan Dept UAT → project accepted.</p>
+  </div>
+</div>
+
+<!-- ============== GANTT ============== -->
+<h2>Timeline (Gantt)</h2>
+<div class="gantt">
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2" style="min-width:260px">Task</th>
+        <th rowspan="2">Owner</th>
+        <th class="week" colspan="5">Week 1 · 22–28 Apr</th>
+        <th class="week" colspan="5">Week 2 · 29 Apr – 05 May</th>
+        <th class="week" colspan="5">Week 3 · 06–13 May</th>
+      </tr>
+      <tr>
+        <th>Wed 22</th><th>Thu 23</th><th>Fri 24</th><th>Mon 27</th><th>Tue 28</th>
+        <th>Wed 29</th><th>Thu 30</th><th>Fri 01</th><th>Mon 04</th><th>Tue 05</th>
+        <th>Wed 06</th><th>Thu 07</th><th>Fri 08</th><th>Mon 11</th><th>Tue–Wed 12-13</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Refactor -->
+      <tr>
+        <td class="task-name">Refactor — isolate per-app modules
+          <small>shared core + independent stock / application_status / factory_* packages</small>
+        </td>
+        <td>Qlik</td>
+        <td colspan="5"><div class="bar bar-refactor">Refactor structure</div></td>
+        <td colspan="10"></td>
+      </tr>
+
+      <!-- Implement export_native with filters -->
+      <tr>
+        <td class="task-name">Implement <code>export_native</code> with all filters — stock_qty
+          <small>selections, variables, bookmark support</small>
+        </td>
+        <td>Qlik</td>
+        <td colspan="5"></td>
+        <td colspan="3"><div class="bar bar-qlik">Implement filters — stock_qty</div></td>
+        <td colspan="7"></td>
+      </tr>
+
+      <tr>
+        <td class="task-name">Implement <code>export_native</code> with all filters — application_status
+          <small>same filter contract as stock_qty</small>
+        </td>
+        <td>Qlik</td>
+        <td colspan="7"></td>
+        <td colspan="3"><div class="bar bar-qlik">Implement — application_status</div></td>
+        <td colspan="5"></td>
+      </tr>
+
+      <!-- Internal testing -->
+      <tr>
+        <td class="task-name">Internal self-testing — data correctness vs. Qlik UI
+          <small>row counts, totals, every filter combination, edge cases</small>
+        </td>
+        <td>Qlik</td>
+        <td colspan="9"></td>
+        <td colspan="2"><div class="bar bar-test">Data parity test</div></td>
+        <td colspan="4"></td>
+      </tr>
+
+      <!-- Savdo testing -->
+      <tr>
+        <td class="task-name">Savdo acceptance testing
+          <small>matches Qlik data, functional check, refresh frequency</small>
+        </td>
+        <td>Savdo</td>
+        <td colspan="11"></td>
+        <td colspan="3"><div class="bar bar-savdo">Savdo testing</div></td>
+        <td colspan="1"></td>
+      </tr>
+
+      <!-- Fixes buffer -->
+      <tr>
+        <td class="task-name">Bugfix buffer (issues found in testing)
+          <small>any rework between Savdo test and UAT</small>
+        </td>
+        <td>Qlik</td>
+        <td colspan="12"></td>
+        <td colspan="1"><div class="bar bar-qlik">Fixes</div></td>
+        <td colspan="2"></td>
+      </tr>
+
+      <!-- UAT & Accept -->
+      <tr>
+        <td class="task-name">UAT demo &amp; Plan Dept sign-off
+          <small>Демонстрация → Обучение → Принятие Гранта</small>
+        </td>
+        <td>Plan Dept</td>
+        <td colspan="13"></td>
+        <td colspan="1"></td>
+        <td colspan="1"><div class="bar bar-plan">UAT + Accept</div></td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="owners">
+    <div class="owner-tag"><span class="dot" style="background:#8e44ad"></span> Refactor</div>
+    <div class="owner-tag"><span class="dot" style="background:#2e9e4f"></span> Qlik dev</div>
+    <div class="owner-tag"><span class="dot" style="background:#e67e22"></span> Internal test (Qlik)</div>
+    <div class="owner-tag"><span class="dot" style="background:#1f6fb2"></span> Savdo testing</div>
+    <div class="owner-tag"><span class="dot" style="background:#6b6b6b"></span> Plan Dept (UAT/Accept)</div>
+  </div>
+</div>
+
+<!-- ============== ACCEPTANCE CRITERIA ============== -->
+<h2>Acceptance criteria</h2>
+<div class="card">
+  <ul>
+    <li class="todo"><strong>Per-app isolation</strong><span class="sub">Changes in one app's code (e.g. stock_qty) must not break other apps. Verified by running regression on factory_data and material_remainder after refactor.</span></li>
+    <li class="todo"><strong>All filters work on <code>export_native</code></strong><span class="sub">Every filter supported on the data endpoints (selections, variables, bookmarks) must produce identical filtered output when used with <code>export_native</code>.</span></li>
+    <li class="todo"><strong>Data parity</strong><span class="sub">Row counts, totals and filter behaviour must match Qlik Sense UI output for both stock_qty and application_status.</span></li>
+    <li class="todo"><strong>Savdo sign-off</strong><span class="sub">Savdo confirms: соответствие ТЗ/ФС, соответствие данных, работа функционала, частота обновления.</span></li>
+    <li class="todo"><strong>Plan Dept UAT accepted</strong><span class="sub">Final demo + training → Принятие Гранта.</span></li>
+  </ul>
+</div>
+
+<footer>
+  <b>Risks / watch-out:</b>
+  Qlik native export does not always honour session hypercube selections the same way the data endpoints do — expect the filter implementation for <code>export_native</code> to require re-applying selections through the Engine API before calling <code>ExportData</code>. Parquet error 3004 already has a fallback; keep it in the refactored structure.
+</footer>
+
+</body>
+</html>

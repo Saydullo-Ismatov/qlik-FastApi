@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Qlik Sense API — Workflow</title>
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #f5f5f5;
+  }
+  h1 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    background: #2e9e4f;
+    color: white;
+    padding: 10px 16px;
+    display: inline-block;
+    border-radius: 4px 4px 0 0;
+  }
+  .wrap {
+    background: white;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    overflow-x: auto;
+  }
+  svg {
+    display: block;
+    min-width: 1400px;
+  }
+  .legend {
+    margin-top: 16px;
+    font-size: 13px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-box {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #2e9e4f;
+    background: white;
+  }
+  .legend-plan { background: #b0b0b0; }
+  .legend-qlik { background: #2e9e4f; }
+  .legend-savdo { background: #1f6fb2; }
+</style>
+</head>
+<body>
+
+<h1>Qlik Sense API — Workflow</h1>
+
+<div class="wrap">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 780" width="100%">
+  <defs>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2e9e4f"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d93025"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f6fb2"/>
+    </marker>
+  </defs>
+
+  <!-- TOP HEADER ROW: stage columns -->
+  <g font-family="Segoe UI" font-size="12" text-anchor="middle">
+    <!-- Stage header background -->
+    <rect x="120" y="0" width="1480" height="40" fill="#2e9e4f"/>
+
+    <!-- Column dividers -->
+    <line x1="120" y1="0" x2="120" y2="780" stroke="#2e9e4f" stroke-width="2"/>
+    <line x1="300" y1="0" x2="300" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="470" y1="0" x2="470" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="640" y1="0" x2="640" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="840" y1="0" x2="840" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="1010" y1="0" x2="1010" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="1180" y1="0" x2="1180" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="1380" y1="0" x2="1380" y2="780" stroke="#2e9e4f" stroke-width="1"/>
+    <line x1="1600" y1="0" x2="1600" y2="780" stroke="#2e9e4f" stroke-width="2"/>
+
+    <!-- Stage headers -->
+    <text x="210" y="25" fill="white" font-weight="600">В очереди</text>
+    <text x="385" y="20" fill="white" font-weight="600">Невозможно удовлетворить /</text>
+    <text x="385" y="34" fill="white" font-weight="600">Отмена</text>
+    <text x="555" y="25" fill="white" font-weight="600">ТЗ / ФС</text>
+    <text x="740" y="25" fill="white" font-weight="600">В работе</text>
+    <text x="925" y="25" fill="white" font-weight="600">Код-ревью</text>
+    <text x="1095" y="25" fill="white" font-weight="600">Тест (Savdo)</text>
+    <text x="1280" y="25" fill="white" font-weight="600">UAT</text>
+    <text x="1490" y="25" fill="white" font-weight="600">Выполнено</text>
+
+    <!-- "Этап" tag -->
+    <text x="1595" y="10" fill="#444" font-size="10" text-anchor="end">Этап</text>
+  </g>
+
+  <!-- LEFT SIDE: swim-lane labels -->
+  <g font-family="Segoe UI" font-size="13" font-weight="700" fill="white" text-anchor="middle">
+    <!-- Plan Department lane -->
+    <rect x="0" y="40" width="120" height="220" fill="#6b6b6b"/>
+    <text x="60" y="140" transform="rotate(-90 60 140)">Plan Department</text>
+    <text x="60" y="158" transform="rotate(-90 60 158)" font-size="11" font-weight="400">(Заказчик)</text>
+
+    <!-- Qlik lane -->
+    <rect x="0" y="260" width="120" height="280" fill="#2e9e4f"/>
+    <text x="60" y="400" transform="rotate(-90 60 400)">Qlik (Development)</text>
+
+    <!-- Savdo lane -->
+    <rect x="0" y="540" width="120" height="240" fill="#1f6fb2"/>
+    <text x="60" y="660" transform="rotate(-90 60 660)">Savdo (Testing)</text>
+  </g>
+
+  <!-- HORIZONTAL lane dividers -->
+  <line x1="120" y1="40" x2="1600" y2="40" stroke="#2e9e4f" stroke-width="2"/>
+  <line x1="120" y1="260" x2="1600" y2="260" stroke="#2e9e4f" stroke-width="1"/>
+  <line x1="120" y1="540" x2="1600" y2="540" stroke="#2e9e4f" stroke-width="1"/>
+  <line x1="120" y1="780" x2="1600" y2="780" stroke="#2e9e4f" stroke-width="2"/>
+
+  <!-- ========== PLAN DEPARTMENT LANE (Заказчик) ========== -->
+
+  <!-- Start: Создание заявки -->
+  <circle cx="210" cy="90" r="16" fill="#3cb54a" stroke="#2e9e4f" stroke-width="2"/>
+  <rect x="170" y="120" width="80" height="38" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="210" y="144" text-anchor="middle" font-family="Segoe UI" font-size="11">Создание заявки</text>
+
+  <!-- Недоработано (yellow) -->
+  <rect x="355" y="85" width="70" height="32" fill="#fff176" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="390" y="106" text-anchor="middle" font-family="Segoe UI" font-size="11">Недоработано</text>
+
+  <!-- Отмена -->
+  <circle cx="385" cy="170" r="22" fill="white" stroke="#d93025" stroke-width="2"/>
+  <text x="385" y="174" text-anchor="middle" font-family="Segoe UI" font-size="11">Отмена</text>
+
+  <!-- Демонстрация приложения (UAT column) -->
+  <rect x="1240" y="100" width="90" height="40" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="1285" y="118" text-anchor="middle" font-family="Segoe UI" font-size="10">Демонстрация</text>
+  <text x="1285" y="132" text-anchor="middle" font-family="Segoe UI" font-size="10">приложения</text>
+
+  <!-- Обучение пользователей -->
+  <rect x="1340" y="100" width="90" height="40" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="1385" y="118" text-anchor="middle" font-family="Segoe UI" font-size="10">Обучение</text>
+  <text x="1385" y="132" text-anchor="middle" font-family="Segoe UI" font-size="10">пользователей</text>
+
+  <!-- Принятие Гранта (final) -->
+  <circle cx="1490" cy="90" r="16" fill="white" stroke="#222" stroke-width="3"/>
+  <rect x="1450" y="120" width="80" height="38" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="1490" y="144" text-anchor="middle" font-family="Segoe UI" font-size="11">Принятие</text>
+
+  <!-- ========== QLIK LANE (Development) ========== -->
+
+  <!-- В очередь -->
+  <circle cx="210" cy="330" r="26" fill="white" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="210" y="334" text-anchor="middle" font-family="Segoe UI" font-size="11">В очередь</text>
+
+  <!-- Оценка на реализацию (diamond) -->
+  <polygon points="210,400 260,440 210,480 160,440" fill="#3cb54a" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="210" y="434" text-anchor="middle" font-family="Segoe UI" font-size="9" fill="white">Оценка на</text>
+  <text x="210" y="446" text-anchor="middle" font-family="Segoe UI" font-size="9" fill="white">реализацию</text>
+
+  <!-- Согласование ТЗ (diamond) in ТЗ/ФС col -->
+  <polygon points="555,400 610,440 555,480 500,440" fill="#3cb54a" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="555" y="438" text-anchor="middle" font-family="Segoe UI" font-size="9" fill="white">Согласование ТЗ</text>
+
+  <!-- В работе (rect) -->
+  <rect x="705" y="425" width="70" height="32" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="740" y="445" text-anchor="middle" font-family="Segoe UI" font-size="11">В работе</text>
+
+  <!-- Разработка (green) -->
+  <rect x="790" y="425" width="70" height="32" fill="#3cb54a" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="825" y="445" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="white">Разработка</text>
+
+  <!-- Условия note (В работе col) -->
+  <path d="M 670 340 L 815 340 L 815 400 L 680 400 L 670 410 Z" fill="white" stroke="#2e9e4f" stroke-width="1"/>
+  <text x="678" y="352" font-family="Segoe UI" font-size="9" font-weight="600">Условия:</text>
+  <text x="678" y="364" font-family="Segoe UI" font-size="9">1. Обновление скрипта</text>
+  <text x="678" y="376" font-family="Segoe UI" font-size="9">2. Сроки отчёта</text>
+  <text x="678" y="388" font-family="Segoe UI" font-size="9">3. Backend</text>
+  <text x="678" y="400" font-family="Segoe UI" font-size="9">4. Частота обновления</text>
+
+  <!-- Код-ревью -->
+  <rect x="890" y="425" width="70" height="32" fill="white" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="925" y="445" text-anchor="middle" font-family="Segoe UI" font-size="11">Код-ревью</text>
+
+  <!-- Сдача разработки (green) -->
+  <rect x="1060" y="330" width="70" height="32" fill="#3cb54a" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="1095" y="344" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">Сдача</text>
+  <text x="1095" y="356" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">разработки</text>
+
+  <!-- Тестирование Разработки (end) -->
+  <rect x="1230" y="330" width="90" height="32" fill="#3cb54a" stroke="#2e9e4f" stroke-width="1.5"/>
+  <text x="1275" y="344" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">Тестирование</text>
+  <text x="1275" y="356" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">Разработки</text>
+
+  <!-- UAT circle -->
+  <circle cx="1285" cy="220" r="22" fill="white" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="1285" y="224" text-anchor="middle" font-family="Segoe UI" font-size="11">UAT</text>
+
+  <!-- Выполнено -->
+  <circle cx="1490" cy="400" r="22" fill="white" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="1490" y="404" text-anchor="middle" font-family="Segoe UI" font-size="11">Выполнено</text>
+
+  <!-- ========== SAVDO LANE (Testing) ========== -->
+
+  <!-- Тест (circle) -->
+  <circle cx="1095" cy="660" r="26" fill="white" stroke="#1f6fb2" stroke-width="2"/>
+  <text x="1095" y="664" text-anchor="middle" font-family="Segoe UI" font-size="11">Тест</text>
+
+  <!-- Testing conditions note -->
+  <path d="M 1150 580 L 1310 580 L 1310 660 L 1160 660 L 1150 670 Z" fill="white" stroke="#1f6fb2" stroke-width="1"/>
+  <text x="1158" y="594" font-family="Segoe UI" font-size="9" font-weight="600">Условия (Savdo):</text>
+  <text x="1158" y="608" font-family="Segoe UI" font-size="9">1. Соответствие ТЗ / ФС</text>
+  <text x="1158" y="622" font-family="Segoe UI" font-size="9">2. Соответствие данных</text>
+  <text x="1158" y="636" font-family="Segoe UI" font-size="9">3. Работа функционала</text>
+  <text x="1158" y="650" font-family="Segoe UI" font-size="9">4. Частота обновления</text>
+
+  <!-- Savdo: приёмка/подтверждение -->
+  <rect x="1050" y="720" width="90" height="32" fill="#1f6fb2" stroke="#1f6fb2" stroke-width="1.5"/>
+  <text x="1095" y="740" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="white">Приёмка теста</text>
+
+  <!-- ERP/DB-like task (ТЗ/ФС from Plan dept → in ТЗ/ФС col, Plan lane) -->
+  <rect x="525" y="160" width="60" height="32" fill="#1f6fb2" stroke="#1f6fb2" stroke-width="1.5"/>
+  <text x="555" y="180" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">Разработка</text>
+  <text x="555" y="191" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="white">ТЗ/ФС</text>
+
+  <!-- ТЗ/ФС circle (below in Qlik lane continuation) -->
+  <circle cx="555" cy="330" r="22" fill="white" stroke="#2e9e4f" stroke-width="2"/>
+  <text x="555" y="334" text-anchor="middle" font-family="Segoe UI" font-size="11">ТЗ/ФС</text>
+
+  <!-- ========== ARROWS ========== -->
+  <!-- Start → В очередь -->
+  <path d="M 210 158 L 210 300" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- В очередь → Оценка на реализацию -->
+  <path d="M 210 356 L 210 400" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Оценка → (No) → Отмена (red) -->
+  <path d="M 260 440 L 320 440 L 320 180 L 365 175" stroke="#d93025" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+  <text x="275" y="432" fill="#d93025" font-family="Segoe UI" font-size="10">Нет</text>
+
+  <!-- Oценка → (Yes) → ТЗ/ФС (down-right) -->
+  <path d="M 210 480 L 210 600 L 555 600 L 555 352" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="220" y="498" fill="#2e9e4f" font-family="Segoe UI" font-size="10">Да</text>
+
+  <!-- ТЗ/ФС circle → Разработка ТЗ (up to Plan dept) -->
+  <path d="M 555 308 L 555 192" stroke="#1f6fb2" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)"/>
+
+  <!-- Разработка ТЗ → Согласование ТЗ (down) -->
+  <path d="M 555 192 L 555 400" stroke="#1f6fb2" stroke-width="1.5" fill="none" stroke-dasharray="4,3"/>
+
+  <!-- Согласование ТЗ → В работе (Yes) -->
+  <path d="M 610 440 L 705 440" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+  <text x="625" y="432" fill="#2e9e4f" font-family="Segoe UI" font-size="10">Да</text>
+
+  <!-- Согласование ТЗ → Отмена (No, red, up) -->
+  <path d="M 555 400 L 555 250 L 410 210 L 405 190" stroke="#d93025" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+  <text x="540" y="300" fill="#d93025" font-family="Segoe UI" font-size="10">Нет</text>
+
+  <!-- В работе → Разработка -->
+  <path d="M 775 440 L 790 440" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Разработка → Код-ревью -->
+  <path d="M 860 440 L 890 440" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Код-ревью → Сдача разработки (up) -->
+  <path d="M 960 440 L 1095 440 L 1095 362" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Сдача разработки → Тест (Savdo — down) -->
+  <path d="M 1095 362 L 1095 634" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Тест → Приёмка теста (Savdo down) -->
+  <path d="M 1095 686 L 1095 720" stroke="#1f6fb2" stroke-width="1.5" fill="none" marker-end="url(#arrow-blue)"/>
+
+  <!-- Тест passes → Тестирование Разработки (up to Qlik) -->
+  <path d="M 1121 660 L 1275 660 L 1275 362" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Тест fails → В работе (red back loop) -->
+  <path d="M 1069 660 L 820 660 L 820 472" stroke="#d93025" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+  <text x="830" y="672" fill="#d93025" font-family="Segoe UI" font-size="10">Ошибка → в работу</text>
+
+  <!-- Тестирование Разработки → UAT (up) -->
+  <path d="M 1275 330 L 1285 242" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- UAT → Демонстрация приложения -->
+  <path d="M 1285 198 L 1285 140" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Демонстрация → Обучение -->
+  <path d="M 1330 120 L 1340 120" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Обучение → Принятие -->
+  <path d="M 1430 120 L 1465 130" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- UAT reject → Отмена (red back to left) -->
+  <path d="M 1263 220 L 410 220 L 405 190" stroke="#d93025" stroke-width="1.5" fill="none" marker-end="url(#arrow-red)"/>
+  <text x="800" y="212" fill="#d93025" font-family="Segoe UI" font-size="10">UAT отклонён</text>
+
+  <!-- Недоработано → Отмена -->
+  <path d="M 390 117 L 388 148" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+  <!-- Принятие → Выполнено (down) -->
+  <path d="M 1490 158 L 1490 378" stroke="#2e9e4f" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+
+</svg>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-box legend-plan"></div> Plan Department — заказчик (создаёт заявку, UAT, приёмка)</div>
+  <div class="legend-item"><div class="legend-box legend-qlik"></div> Qlik — разработка, код-ревью, сдача</div>
+  <div class="legend-item"><div class="legend-box legend-savdo"></div> Savdo — тестирование</div>
+  <div class="legend-item"><div class="legend-box" style="border-color:#d93025;"></div> Красные стрелки — отмена/возврат</div>
+</div>
+
+</body>
+</html>
